@@ -1,0 +1,335 @@
+<!doctype html>
+<!--
+  Focus — mockup page.
+  A stand-in for youtube.com/watch: a minimal fake of the DOM that Focus
+  touches (ytd-app, #movie_player, <video>, search results), a stubbed
+  chrome.storage, and a fake MAIN-world bridge. The real src/*.js and
+  src/*.css are loaded unmodified, so what you see is the extension's own UI.
+  Scenes: watch | idle | menu | library | liked | playlist | settings | ad | home | results | off
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Arctic Monkeys - 505 (Official Audio) - YouTube</title>
+<style>
+  /* Plain YouTube look-alike, only visible with Focus off (scene=off). */
+  body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: Roboto, "Noto Sans", Arial, sans-serif; }
+  ytd-app { display: block; }
+  ytd-masthead { display: flex; align-items: center; gap: 16px; height: 56px; padding: 0 16px; }
+  .yt-logo { display: flex; align-items: center; gap: 4px; font-weight: 700; letter-spacing: -0.04em; font-size: 19px; }
+  .yt-logo i { width: 28px; height: 20px; border-radius: 6px; background: #f00; display: inline-block; position: relative; }
+  .yt-logo i::after { content: ""; position: absolute; left: 11px; top: 6px; border: 4px solid transparent; border-left: 7px solid #fff; }
+  .yt-search { margin: 0 auto; width: 540px; height: 38px; border: 1px solid #303030; border-radius: 40px; background: #121212; }
+  .yt-avatar { width: 32px; height: 32px; border-radius: 50%; background: #5b6a8a; }
+  .yt-bell { width: 22px; height: 22px; border-radius: 4px; background: #303030; position: relative; }
+  .yt-bell::after { content: "9+"; position: absolute; top: -6px; right: -10px; font-size: 10px; background: #c00; border-radius: 8px; padding: 0 4px; }
+  ytd-watch-flexy { display: block; }
+  ytd-watch-flexy #columns { display: flex; gap: 24px; padding: 24px 24px 0 24px; }
+  ytd-watch-flexy #primary { flex: 1; min-width: 0; }
+  ytd-watch-flexy #secondary { width: 402px; flex: none; }
+  #movie_player { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden; }
+  .html5-video-container, video.html5-main-video { position: absolute; inset: 0; width: 100%; height: 100%; }
+  video.html5-main-video { object-fit: cover; }
+  .ytp-chrome-bottom { position: absolute; left: 12px; right: 12px; bottom: 8px; height: 40px; }
+  .ytp-chrome-bottom::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(to right, #f00 40%, rgba(255,255,255,.3) 40%); }
+  .yt-h1 { font-size: 20px; font-weight: 600; margin: 12px 0 10px; }
+  .yt-owner { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .yt-pill { padding: 8px 14px; border-radius: 18px; background: #272727; font-size: 13px; }
+  .yt-pill.sub { background: #f1f1f1; color: #0f0f0f; font-weight: 600; }
+  .yt-desc { margin-top: 12px; padding: 12px; border-radius: 12px; background: #272727; height: 60px; font-size: 13px; color: #aaa; }
+  ytd-comments { display: block; margin-top: 22px; font-size: 16px; font-weight: 600; }
+  .yt-c { display: flex; gap: 12px; margin-top: 18px; font-weight: 400; font-size: 13px; color: #ccc; }
+  .yt-c i { width: 40px; height: 40px; border-radius: 50%; background: #3a3a3a; flex: none; }
+  .yt-rec { display: flex; gap: 8px; margin-bottom: 8px; }
+  .yt-rec b { width: 168px; height: 94px; border-radius: 8px; flex: none; }
+  .yt-rec span { font-size: 13px; font-weight: 500; line-height: 1.35; }
+  .yt-rec small { display: block; margin-top: 4px; color: #aaa; font-weight: 400; font-size: 12px; }
+  .yt-chips { display: flex; gap: 8px; margin-bottom: 12px; }
+  .yt-chips span { padding: 6px 12px; border-radius: 8px; background: #272727; font-size: 13px; }
+  .yt-chips span:first-child { background: #f1f1f1; color: #0f0f0f; }
+  .ytp-ad-module { position: absolute; inset: 0; z-index: 20; pointer-events: none; }
+  .mock-skip { position: absolute; right: 0; bottom: 18%; padding: 9px 14px 9px 16px; background: rgba(0,0,0,.6); color: #fff; font: 500 13px Roboto, "Noto Sans", sans-serif; border-radius: 18px 0 0 18px; }
+  .mock-adbadge { position: absolute; left: 12px; bottom: 14px; color: #fff; font: 500 12px Roboto, "Noto Sans", sans-serif; background: rgba(0,0,0,.6); padding: 3px 8px; border-radius: 4px; }
+  /* Screenshots are taken in virtual time: no transitions, final states only. */
+  #fx-ui *, #fx-back *, #fx-cover * { transition: none !important; animation: none !important; }
+</style>
+<script>
+  // ---------------------------------------------------------------- route
+  const params = new URLSearchParams(location.search);
+  const scene = params.get("scene") || "watch";
+  const VID = "qU9mHegkTc4";
+  const routes = { home: "/", results: "/results?search_query=arctic+monkeys" };
+  history.replaceState(null, "", routes[scene] || `/watch?v=${VID}`);
+
+  // ---------------------------------------------------------------- chrome.storage stub
+  (() => {
+    const now = Date.now();
+    const song = (id, title, artist, duration, extra = {}) => ({ id, title, artist, channel: artist, thumb: "", duration, ...extra });
+    const S = [
+      song(VID, "505", "Arctic Monkeys", 253, { liked: true, likedAt: now - 1e5 }),
+      song("GCdwKhTtNNw", "Sweater Weather", "The Neighbourhood", 240, { liked: true, likedAt: now - 2e5 }),
+      song("Xz5u8mYfR3Y", "Space Song", "Beach House", 320, { liked: true, likedAt: now - 3e5 }),
+      song("1Ol8h3r6WbM", "Apocalypse", "Cigarettes After Sex", 290, { liked: true, likedAt: now - 4e5 }),
+      song("bpOSxM0rNPM", "Do I Wanna Know?", "Arctic Monkeys", 272, { liked: true, likedAt: now - 5e5 }),
+      song("9sfYpolGCu8", "Motion Sickness", "Phoebe Bridgers", 229),
+      song("uzS3WG6__G4", "Pink + White", "Frank Ocean", 184, { liked: true, likedAt: now - 6e5 }),
+      song("r4l9bFqgMaQ", "Nights", "Frank Ocean", 307),
+      song("Bm5iA4Zupek", "Nothing's Gonna Hurt You Baby", "Cigarettes After Sex", 286),
+      song("hTWKbfoikeg", "Smells Like Teen Spirit", "Nirvana", 301),
+    ];
+    const songs = Object.fromEntries(S.map((s) => [s.id, s]));
+    const store = {
+      settings: { focus: scene !== "off", videoMode: scene === "cover" ? "cover" : scene === "dark" ? "dark" : "video" },
+      songs,
+      recent: [VID, "9sfYpolGCu8", "GCdwKhTtNNw", "r4l9bFqgMaQ", "Bm5iA4Zupek", "uzS3WG6__G4", "hTWKbfoikeg"],
+      playlists: [
+        { id: "pl1", name: "late night", ids: [VID, "1Ol8h3r6WbM", "Bm5iA4Zupek", "Xz5u8mYfR3Y", "r4l9bFqgMaQ"], createdAt: now },
+        { id: "pl2", name: "deep work", ids: ["Xz5u8mYfR3Y", "uzS3WG6__G4"], createdAt: now },
+        { id: "pl3", name: "run", ids: ["hTWKbfoikeg", "bpOSxM0rNPM", "GCdwKhTtNNw"], createdAt: now },
+      ],
+    };
+    const listeners = [];
+    window.chrome = {
+      runtime: { id: "mock" },
+      storage: {
+        local: {
+          async get(keys) {
+            const out = {};
+            for (const k of [].concat(keys)) if (k in store) out[k] = structuredClone(store[k]);
+            return out;
+          },
+          async set(patch) {
+            const changes = {};
+            for (const [k, v] of Object.entries(patch)) {
+              changes[k] = { oldValue: store[k], newValue: structuredClone(v) };
+              store[k] = structuredClone(v);
+            }
+            listeners.forEach((fn) => fn(changes, "local"));
+          },
+        },
+        onChanged: { addListener: (fn) => listeners.push(fn) },
+      },
+    };
+  })();
+
+  // ---------------------------------------------------------------- artwork
+  // A dusk skyline seen through a window, painted once; used as the "video".
+  function paintArtwork(w = 1280, h = 720) {
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const g = c.getContext("2d");
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+
+    const sky = g.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, "#0d1020");
+    sky.addColorStop(0.35, "#2a2240");
+    sky.addColorStop(0.55, "#7a3f3f");
+    sky.addColorStop(0.68, "#d0703c");
+    sky.addColorStop(0.74, "#3a2730");
+    sky.addColorStop(1, "#08080c");
+    g.fillStyle = sky; g.fillRect(0, 0, w, h);
+
+    // clouds
+    for (let i = 0; i < 26; i++) {
+      const y = h * (0.18 + rnd() * 0.42), x = rnd() * w, rw = 120 + rnd() * 320;
+      const cg = g.createRadialGradient(x, y, 0, x, y, rw);
+      cg.addColorStop(0, `rgba(${200 + rnd() * 50},${90 + rnd() * 60},${70 + rnd() * 40},${0.12 + rnd() * 0.12})`);
+      cg.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = cg;
+      g.save(); g.translate(x, y); g.scale(1, 0.18); g.translate(-x, -y);
+      g.beginPath(); g.arc(x, y, rw, 0, Math.PI * 2); g.fill(); g.restore();
+    }
+    // sun glow
+    const sun = g.createRadialGradient(w * 0.62, h * 0.7, 0, w * 0.62, h * 0.7, w * 0.5);
+    sun.addColorStop(0, "rgba(255,170,90,.45)"); sun.addColorStop(1, "rgba(255,120,60,0)");
+    g.fillStyle = sun; g.fillRect(0, 0, w, h);
+
+    // skyline
+    const base = h * 0.74;
+    for (let layer = 0; layer < 2; layer++) {
+      let x = -10;
+      while (x < w) {
+        const bw = 18 + rnd() * 46, bh = (layer ? 30 : 60) + rnd() * (layer ? 110 : 170);
+        g.fillStyle = layer ? "#120f17" : "#1d1722";
+        g.fillRect(x, base - bh + (layer ? 30 : 0), bw, h);
+        if (rnd() > 0.85) g.fillRect(x + bw / 2 - 1, base - bh - 40 + (layer ? 30 : 0), 2, 40);
+        for (let wy = base - bh + 8 + (layer ? 30 : 0); wy < h * 0.95; wy += 7)
+          for (let wx = x + 4; wx < x + bw - 3; wx += 6)
+            if (rnd() > 0.82) { g.fillStyle = `rgba(255,${180 + rnd() * 50},${110 + rnd() * 50},${0.4 + rnd() * 0.5})`; g.fillRect(wx, wy, 2, 2); }
+        x += bw + rnd() * 4;
+      }
+    }
+    // water reflection
+    const water = g.createLinearGradient(0, h * 0.82, 0, h);
+    water.addColorStop(0, "rgba(208,112,60,.18)"); water.addColorStop(1, "rgba(0,0,0,.9)");
+    g.fillStyle = water; g.fillRect(0, h * 0.84, w, h);
+
+    // window frame + silhouette
+    g.fillStyle = "#07070a";
+    g.fillRect(0, 0, w * 0.2, h); g.fillRect(w * 0.2, 0, 16, h); g.fillRect(0, h * 0.9, w, h);
+    g.beginPath();
+    const px = w * 0.43, py = h * 0.5;
+    g.ellipse(px, py, 44, 52, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath();
+    g.moveTo(px - 150, h); g.bezierCurveTo(px - 140, py + 90, px - 70, py + 60, px, py + 56);
+    g.bezierCurveTo(px + 70, py + 60, px + 140, py + 90, px + 150, h); g.fill();
+
+    // vignette + grain
+    const vg = g.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, w * 0.75);
+    vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.55)");
+    g.fillStyle = vg; g.fillRect(0, 0, w, h);
+    const img = g.getImageData(0, 0, w, h), d = img.data;
+    for (let i = 0; i < d.length; i += 4) { const n = (rnd() - 0.5) * 14; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+    g.putImageData(img, 0, 0);
+    return c.toDataURL("image/jpeg", 0.9);
+  }
+
+  // ---------------------------------------------------------------- fake bridge (MAIN world)
+  const mock = { paused: scene === "idle" ? false : false, t: scene === "ad" ? 4 : 102, volume: 64, muted: false };
+  window.addEventListener("message", (e) => {
+    const m = e.data;
+    if (!m || m["fx-bridge"] !== "in") return;
+    if (m.type === "toggle") mock.paused = !mock.paused;
+    if (m.type === "seek") mock.t = m.data.t;
+    if (m.type === "volume") mock.volume = m.data.v;
+    if (m.type === "mute") mock.muted = m.data.m;
+    postState();
+  });
+  function postState() {
+    if (scene === "home") return window.postMessage({ "fx-bridge": "out", type: "state", data: null }, location.origin);
+    window.postMessage({ "fx-bridge": "out", type: "state", data: {
+      id: VID, title: "Arctic Monkeys - 505 (Official Audio)", author: "ArcticMonkeysVEVO",
+      duration: 253, volume: mock.volume, muted: mock.muted, playlist: false,
+    } }, location.origin);
+  }
+  setInterval(postState, 400);
+</script>
+<script src="/src/shared.js"></script>
+<script src="/src/ads.js"></script>
+<script src="/src/focus.js"></script>
+<link rel="stylesheet" href="/src/ads.css">
+<link rel="stylesheet" href="/src/focus.css">
+</head>
+<body>
+<ytd-app>
+  <ytd-masthead>
+    <span class="yt-logo"><i></i>YouTube</span>
+    <span class="yt-search"></span>
+    <span class="yt-bell"></span>
+    <span class="yt-avatar"></span>
+  </ytd-masthead>
+  <ytd-page-manager>
+    <ytd-watch-flexy>
+      <div id="columns">
+        <div id="primary"><div id="primary-inner">
+          <div id="player"><ytd-player><div id="container">
+            <div id="movie_player" class="html5-video-player">
+              <div class="html5-video-container"><video class="html5-main-video" muted playsinline></video></div>
+              <div class="ytp-chrome-bottom"></div>
+              <div class="ytp-ad-module"></div>
+            </div>
+          </div></ytd-player></div>
+          <div id="below">
+            <div class="yt-h1">Arctic Monkeys - 505 (Official Audio)</div>
+            <div class="yt-owner"><span class="yt-avatar"></span><b>Arctic Monkeys</b><span class="yt-pill sub">Subscribe</span><span class="yt-pill">👍 1.4M</span><span class="yt-pill">Share</span><span class="yt-pill">Download</span><span class="yt-pill">⋯</span></div>
+            <div class="yt-desc">412M views · 9 years ago · Arctic Monkeys - 505 (Official Audio) Listen to more from Arctic Monkeys…</div>
+            <ytd-comments>48,213 Comments
+              <div class="yt-c"><i></i><span>@user1 · this song at 2am hits different</span></div>
+              <div class="yt-c"><i></i><span>@user2 · the build-up at 2:30 😭</span></div>
+            </ytd-comments>
+          </div>
+        </div></div>
+        <div id="secondary">
+          <div class="yt-chips"><span>All</span><span>From Arctic Monkeys</span><span>Related</span><span>Recently uploaded</span></div>
+        </div>
+      </div>
+    </ytd-watch-flexy>
+    <ytd-search></ytd-search>
+  </ytd-page-manager>
+</ytd-app>
+<script>
+  // ---------------------------------------------------------------- fake YouTube contents
+  const art = paintArtwork();
+  // "Cover art" for the cover scene: a square sleeve on a dark field.
+  const cover = (() => {
+    const c = document.createElement("canvas"); c.width = 1280; c.height = 720;
+    const g = c.getContext("2d");
+    const bg = g.createLinearGradient(0, 0, 0, 720); bg.addColorStop(0, "#15121a"); bg.addColorStop(1, "#060608");
+    g.fillStyle = bg; g.fillRect(0, 0, 1280, 720);
+    const img = new Image(); img.src = art;
+    return { draw: () => new Promise((r) => { img.onload = () => {
+      g.save(); g.shadowColor = "rgba(0,0,0,.7)"; g.shadowBlur = 60; g.shadowOffsetY = 20;
+      g.fillStyle = "#000"; g.fillRect(400, 80, 560, 560); g.restore();
+      g.drawImage(img, 300, 0, 720, 720, 400, 80, 560, 560);
+      g.fillStyle = "rgba(255,255,255,.75)"; g.font = "600 30px Noto Sans, sans-serif"; g.fillText("505", 430, 130);
+      g.font = "400 18px Noto Sans, sans-serif"; g.fillStyle = "rgba(255,255,255,.5)"; g.fillText("ARCTIC MONKEYS", 432, 158);
+      r(c.toDataURL("image/jpeg", 0.9)); }; }) };
+  })();
+  const sec = document.getElementById("secondary");
+  const recs = ["Do I Wanna Know? (Official Video)", "I Wanna Be Yours", "Why'd You Only Call Me When You're High?", "R U Mine?", "Sweater Weather", "Mix — Arctic Monkeys", "Fluorescent Adolescent", "Top 50 Indie Songs 2026"];
+  const hues = [210, 15, 280, 340, 30, 190, 120, 260];
+  recs.forEach((r, i) => sec.insertAdjacentHTML("beforeend",
+    `<div class="yt-rec"><b style="background:linear-gradient(135deg,hsl(${hues[i]} 45% 30%),hsl(${hues[i] + 40} 50% 14%))"></b><span>${r}<small>Channel · ${(i + 2) * 37}M views</small></span></div>`));
+
+  const player = document.getElementById("movie_player");
+  const video = player.querySelector("video");
+  if (scene === "home") {
+    player.remove();
+    document.title = "YouTube";
+  } else {
+    video.poster = art;
+    // Stub the media element so focus.js reads a stable "now playing" state.
+    const def = (k, get, set) => Object.defineProperty(video, k, { configurable: true, get, set: set || (() => {}) });
+    def("currentTime", () => mock.t, (v) => (mock.t = v));
+    def("duration", () => (scene === "ad" ? 15 : 253));
+    def("paused", () => mock.paused);
+    def("ended", () => false);
+    def("readyState", () => 4);
+    def("playbackRate", () => (scene === "ad" ? 16 : 1));
+  }
+
+  if (scene === "ad") {
+    player.classList.add("ad-showing");
+    player.querySelector(".ytp-ad-module").innerHTML = '<div class="mock-adbadge">Sponsored · 1 of 1 · 0:11</div><div class="mock-skip">Skip in 1</div>';
+  }
+
+  if (scene === "results") {
+    document.title = "arctic monkeys - YouTube";
+    const results = [
+      ["Arctic Monkeys - Do I Wanna Know? (Official Video)", "ArcticMonkeysVEVO", "4:32", "bpOSxM0rNPM"],
+      ["Arctic Monkeys - 505 (Official Audio)", "ArcticMonkeysVEVO", "4:13", VID],
+      ["Arctic Monkeys - I Wanna Be Yours", "ArcticMonkeysVEVO", "3:04", "fJLQCf4mFP0"],
+      ["Arctic Monkeys - Why'd You Only Call Me When You're High? (Official Video)", "ArcticMonkeysVEVO", "2:43", "6366dxFf-Os"],
+      ["Arctic Monkeys - R U Mine? (Official Video)", "ArcticMonkeysVEVO", "3:22", "ngzC_8zqInk"],
+      ["Arctic Monkeys - Fluorescent Adolescent (Official Video)", "ArcticMonkeysVEVO", "3:03", "ma9I9VBKPiw"],
+      ["Arctic Monkeys - Mardy Bum", "Arctic Monkeys - Topic", "2:55", "q8WRB4zr9Lk"],
+      ["Arctic Monkeys - There'd Better Be A Mirrorball (Official Video)", "ArcticMonkeysVEVO", "4:24", "z7HgxQ1yE-c"],
+    ];
+    document.querySelector("ytd-search").innerHTML = results.map(([title, ch, dur, id]) =>
+      `<ytd-video-renderer><a id="video-title" href="/watch?v=${id}" title="${title}">${title}</a>
+       <ytd-channel-name><span id="text">${ch}</span></ytd-channel-name>
+       <ytd-thumbnail-overlay-time-status-renderer><span id="text">${dur}</span></ytd-thumbnail-overlay-time-status-renderer></ytd-video-renderer>`).join("");
+  }
+
+  // ---------------------------------------------------------------- stage the scene
+  cover.draw().then((coverUrl) => FX.ready.then(() => setTimeout(() => {
+    const cover = coverUrl;
+    const ui = FX.ui;
+    ui.S.lastMove = Date.now() + 1e9; // keep corners visible...
+    if (scene === "idle") ui.S.lastMove = 0; // ...except in the idle scene
+    if (ui.E.backImg && scene !== "home") ui.E.backImg.src = art;
+    if (ui.E.coverImg && scene !== "home") { ui.E.coverImg.dataset.step = "1"; ui.E.coverImg.src = cover; }
+    if (scene === "menu") ui.openMenu();
+    if (scene === "library") ui.openPanel("library");
+    if (scene === "liked") ui.openPanel("liked");
+    if (scene === "playlist") ui.openPanel("pl:pl1");
+    if (scene === "settings") ui.openPanel("settings");
+    if (scene === "pop") ui.openPop();
+    if (scene === "home") ui.E.input.blur();
+    setTimeout(() => document.activeElement?.blur?.(), 120);
+    document.documentElement.dataset.ready = "1";
+  }, 300)));
+</script>
+</body>
+</html>

@@ -1,0 +1,341 @@
+/* Focus panel — segue o visual do GNOME Shell (Adwaita) e usa a cor de destaque
+ * do sistema (-st-accent-color), igual aos Ajustes Rápidos. */
+
+.ytf-panel-label {
+  max-width: 180px;
+  padding-left: 6px;
+}
+
+.ytf-menu {
+  padding: 12px;
+}
+
+.ytf-root {
+  width: 380px;
+  spacing: 6px;
+}
+
+/* --- Tocando agora --------------------------------------------------- */
+
+.ytf-now {
+  spacing: 12px;
+  padding-bottom: 4px;
+}
+
+.ytf-cover {
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  background-color: rgba(127, 127, 127, 0.18);
+  background-size: cover;
+  background-position: center;
+}
+
+.ytf-cover-placeholder {
+  icon-size: 32px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.ytf-title {
+  font-weight: bold;
+  font-size: 11.5pt;
+}
+
+.ytf-artist {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 10pt;
+  padding-top: 2px;
+}
+
+.ytf-artist.ytf-ad {
+  color: -st-accent-color;
+}
+
+/* --- Progresso / tempos ---------------------------------------------- */
+
+.ytf-progress {
+  margin-top: 4px;
+}
+
+.ytf-times {
+  font-size: 8.5pt;
+  font-feature-settings: "tnum";
+  color: rgba(255, 255, 255, 0.55);
+  padding: 0 4px;
+}
+
+/* --- Botões ---------------------------------------------------------- */
+
+.ytf-icon-button {
+  border-radius: 999px;
+  padding: 10px;
+  margin: 0 4px;
+  transition-duration: 100ms;
+}
+
+.ytf-icon-button StIcon {
+  icon-size: 16px;
+}
+
+.ytf-icon-button:hover,
+.ytf-icon-button:focus {
+  background-color: rgba(127, 127, 127, 0.22);
+}
+
+.ytf-icon-button:active {
+  background-color: rgba(127, 127, 127, 0.32);
+}
+
+.ytf-icon-button:insensitive {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.ytf-toggle:checked,
+.ytf-like:checked {
+  color: -st-accent-color;
+}
+
+.ytf-play {
+  padding: 14px;
+  margin: 0 10px;
+  background-color: -st-accent-color;
+  color: -st-accent-fg-color;
+}
+
+.ytf-play StIcon {
+  icon-size: 20px;
+}
+
+.ytf-play:hover,
+.ytf-play:focus {
+  background-color: -st-accent-color;
+  box-shadow: inset 0 0 0 100px rgba(255, 255, 255, 0.12);
+}
+
+.ytf-play:active {
+  box-shadow: inset 0 0 0 100px rgba(0, 0, 0, 0.12);
+}
+
+.ytf-controls {
+  padding: 2px 0 4px;
+}
+
+.ytf-small {
+  padding: 7px;
+  margin: 0 1px;
+}
+
+.ytf-small StIcon {
+  icon-size: 14px;
+}
+
+.ytf-accent {
+  background-color: -st-accent-color;
+  color: -st-accent-fg-color;
+}
+
+.ytf-accent:hover,
+.ytf-accent:focus {
+  background-color: -st-accent-color;
+  box-shadow: inset 0 0 0 100px rgba(255, 255, 255, 0.12);
+}
+
+.ytf-danger:hover {
+  color: #ff7b63;
+}
+
+/* --- Volume ---------------------------------------------------------- */
+
+.ytf-volume {
+  spacing: 10px;
+  padding: 0 4px 2px;
+}
+
+.ytf-volume-icon {
+  icon-size: 16px;
+}
+
+.ytf-separator {
+  height: 1px;
+  margin: 6px 0;
+  background-color: rgba(127, 127, 127, 0.25);
+}
+
+/* --- Abas (estilo "linked buttons" do Adwaita) ------------------------ */
+
+.ytf-tabs {
+  background-color: rgba(127, 127, 127, 0.14);
+  border-radius: 12px;
+  padding: 3px;
+  spacing: 3px;
+}
+
+.ytf-tab {
+  border-radius: 9px;
+  padding: 6px 4px;
+  font-size: 10pt;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.7);
+  transition-duration: 100ms;
+}
+
+.ytf-tab:hover,
+.ytf-tab:focus {
+  background-color: rgba(127, 127, 127, 0.18);
+  color: #fff;
+}
+
+.ytf-tab:checked {
+  background-color: -st-accent-color;
+  color: -st-accent-fg-color;
+}
+
+.ytf-tab-content {
+  spacing: 6px;
+}
+
+.ytf-tab-icon {
+  icon-size: 14px;
+}
+
+/* --- Busca / entradas ------------------------------------------------ */
+
+.ytf-search {
+  border-radius: 12px;
+  padding: 8px 10px;
+  margin: 4px 0 2px;
+}
+
+.ytf-search-icon {
+  icon-size: 14px;
+  padding-right: 6px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* --- Lista de faixas ------------------------------------------------- */
+
+.ytf-scroll {
+  height: 300px;
+}
+
+.ytf-list {
+  spacing: 2px;
+  padding-top: 2px;
+}
+
+.ytf-list-header {
+  spacing: 4px;
+  padding: 6px 2px 2px 6px;
+}
+
+.ytf-header-title {
+  font-weight: bold;
+  font-size: 10.5pt;
+}
+
+.ytf-row {
+  border-radius: 10px;
+  padding: 4px 4px 4px 6px;
+  transition-duration: 100ms;
+}
+
+.ytf-row:hover {
+  background-color: rgba(127, 127, 127, 0.16);
+}
+
+.ytf-row:focus {
+  background-color: rgba(127, 127, 127, 0.22);
+}
+
+.ytf-row:checked .ytf-row-title {
+  color: -st-accent-color;
+}
+
+.ytf-row-content {
+  spacing: 10px;
+}
+
+.ytf-row-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: 7px;
+  background-color: rgba(127, 127, 127, 0.18);
+  background-size: cover;
+  background-position: center;
+}
+
+.ytf-row-cover .ytf-cover-placeholder {
+  icon-size: 18px;
+}
+
+.ytf-row-title {
+  font-size: 10pt;
+  font-weight: bold;
+}
+
+.ytf-row-sub {
+  font-size: 9pt;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.ytf-chevron,
+.ytf-pick-icon {
+  icon-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 0 8px;
+}
+
+.ytf-row-main:insensitive .ytf-row-title {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.ytf-empty {
+  padding: 48px 0;
+  spacing: 10px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ytf-empty-icon {
+  icon-size: 40px;
+}
+
+.ytf-hint {
+  padding: 24px 0;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* --- Rodapé ---------------------------------------------------------- */
+
+.ytf-footer {
+  padding-top: 4px;
+}
+
+.ytf-status {
+  font-size: 9pt;
+  color: rgba(255, 255, 255, 0.55);
+  padding-left: 4px;
+}
+
+.ytf-pick-row {
+  padding: 10px 6px;
+}
+
+/* --- Focus ----------------------------------------------------------- */
+
+.ytf-panel-icon {
+  icon-size: 16px;
+}
+
+.ytf-tab {
+  padding: 6px 2px;
+  font-size: 9.5pt;
+}
+
+.ytf-tab-content {
+  spacing: 5px;
+}
+
+/* video mode / focus buttons: highlighted when not on the default */
+.ytf-toggle:checked {
+  color: -st-accent-color;
+}

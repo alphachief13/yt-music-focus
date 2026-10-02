@@ -1,0 +1,64 @@
+/* Focus — ad overlay, ported from yt-ads-sucks.
+ * The overlay is inserted right after .html5-video-container: above the
+ * <video>, below .ytp-ad-module (Skip button, countdown).
+ * pointer-events: none lets clicks through. */
+.ytas-blackout {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: #000;
+  pointer-events: none;
+  z-index: 10;
+  color: rgba(232, 229, 223, 0.42);
+  font-family: ui-sans-serif, "Inter", "Roboto", system-ui, sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 24px;
+}
+
+.ytas-blackout-title {
+  font-size: 13px;
+  color: rgba(232, 229, 223, 0.78);
+}
+
+.html5-video-player.ad-showing:not(.ytas-reveal):not(.ytas-no-blackout) .ytas-blackout,
+.html5-video-player.ad-interrupting:not(.ytas-reveal):not(.ytas-no-blackout) .ytas-blackout {
+  display: flex;
+}
+
+/* Show/hide ad button. */
+.ytas-toggle {
+  display: none;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+  padding: 4px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  color: rgba(232, 229, 223, 0.7);
+  font-family: ui-sans-serif, "Inter", "Roboto", system-ui, sans-serif;
+  font-size: 11px;
+  line-height: 1.3;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.ytas-toggle:hover,
+.ytas-toggle:focus-visible {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+  outline: none;
+}
+
+.html5-video-player.ad-showing:not(.ytas-no-blackout) .ytas-toggle,
+.html5-video-player.ad-interrupting:not(.ytas-no-blackout) .ytas-toggle {
+  display: block;
+}

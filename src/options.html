@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="dark">
+<title>Focus · Ajustes</title>
+<link rel="stylesheet" href="options.css">
+</head>
+<body>
+<main>
+  <div class="word">focus</div>
+
+  <section aria-labelledby="desktop-title">
+    <div class="row">
+      <div>
+        <h1 id="desktop-title" data-i18n="title">Painel do desktop</h1>
+        <p class="sub" data-i18n="sub">Mostra e controla o Focus pelo painel do GNOME. Opcional: sem isso, o Focus funciona igual.</p>
+      </div>
+      <button type="button" id="toggle" class="switch" role="switch" aria-checked="false" aria-labelledby="desktop-title"><span></span></button>
+    </div>
+
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+
+    <div id="setup" hidden>
+      <p data-i18n="setup">Instale o painel uma vez (Linux com GNOME 48–49):</p>
+      <pre><code id="cmd"></code></pre>
+      <button type="button" id="copy" class="link" data-i18n="copy">Copiar comando</button>
+      <button type="button" id="retry" class="link" data-i18n="retry">Tentar de novo</button>
+    </div>
+  </section>
+
+  <p class="foot" data-i18n="foot">O áudio continua vindo desta aba do YouTube; o painel só espelha e controla o Focus.</p>
+</main>
+<script src="shared.js"></script>
+<script src="options.js"></script>
+</body>
+</html>

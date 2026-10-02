@@ -1,0 +1,6 @@
+{
+  "uuid": "snap@ytf-test",
+  "name": "Focus panel screenshots (test only)",
+  "description": "Opens the Focus panel and saves screenshots.",
+  "shell-version": ["48", "49"]
+}

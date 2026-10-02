@@ -1,0 +1,839 @@
+/* ==========================================================================
+   Focus — the listening layer over youtube.com
+   --------------------------------------------------------------------------
+   html classes (set by focus.js):
+     fx-enabled  Focus setting is on
+     fx-on       Focus is active on this page (enabled, not fullscreen, not a
+                 pass-through page like /account)
+     fx-watch    /watch page            fx-page   any other page (home/search)
+     fx-results  /results page          fx-fs     browser fullscreen
+     fx-idle     mouse resting          fx-panel-open  library panel open
+     fx-ambient  ambient glow on        fx-ad     ad is playing
+     fx-vcover   video off, cover art   fx-vdark  video off, plain dark
+   ========================================================================== */
+
+html {
+  --fx-bg: #0a0a0a;
+  --fx-fg: #e9e6e0;
+  --fx-dim: rgba(233, 230, 224, 0.5);
+  --fx-faint: rgba(233, 230, 224, 0.28);
+  --fx-ghost: rgba(233, 230, 224, 0.14);
+  --fx-line: rgba(255, 255, 255, 0.07);
+  --fx-accent: #a9c2b4; /* the one, very quiet accent: muted sage */
+  --fx-font: "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --fx-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  /* Geometry: a small 16:9 window, the whole stack (≈330px of text and
+     controls below it) centred vertically. */
+  --fx-w: min(580px, 46vw, calc((100vh - 400px) * 16 / 9));
+  --fx-h: calc(var(--fx-w) * 9 / 16);
+  --fx-top: max(64px, calc((100vh - var(--fx-h) - 330px) / 2));
+}
+
+/* --------------------------------------------------------------------------
+   1. Delete YouTube (visually). Nothing is removed from the DOM, so YouTube
+      keeps working; `visibility` lets the player opt back in below.
+   -------------------------------------------------------------------------- */
+html.fx-on,
+html.fx-on body {
+  overflow: hidden !important;
+}
+html.fx-on {
+  background: var(--fx-bg) !important;
+  color-scheme: dark;
+}
+html.fx-on body {
+  background: transparent !important;
+}
+html.fx-on ytd-app {
+  visibility: hidden !important;
+  z-index: auto !important;
+}
+
+/* Things that would still cost attention or CPU even while invisible. */
+html.fx-on :is(
+  ytd-masthead, #masthead-container, tp-yt-app-drawer#guide, ytd-mini-guide-renderer,
+  ytd-watch-flexy #secondary, ytd-watch-flexy #below, ytd-watch-flexy #chat-container,
+  ytd-watch-flexy #panels, ytd-comments, ytd-browse[page-subtype="home"] ytd-rich-grid-renderer,
+  ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], ytd-shorts, ytd-miniplayer .ytp-miniplayer-ui
+) {
+  display: none !important;
+}
+
+/* YouTube dialogs (consent, "still watching?") must stay usable. */
+html.fx-on :is(ytd-popup-container, tp-yt-iron-overlay-backdrop) {
+  visibility: visible !important;
+}
+/* ...but promos ("Try YouTube Music / Premium", surveys, banners) are noise. */
+html.fx-enabled :is(
+  ytd-mealbar-promo-renderer, yt-mealbar-promo-renderer, ytd-single-option-survey-renderer,
+  ytd-statement-banner-renderer, ytd-background-promo-renderer, ytd-banner-promo-renderer,
+  ytd-popup-container tp-yt-paper-dialog:has(ytd-mealbar-promo-renderer, yt-mealbar-promo-renderer)
+) {
+  display: none !important;
+}
+
+/* End-screen walls, pause overlays and in-video suggestions — hidden whenever
+   Focus is enabled, fullscreen included. */
+html.fx-enabled .html5-video-player :is(
+  .ytp-ce-element, .ytp-endscreen-content, .html5-endscreen, .ytp-pause-overlay,
+  .ytp-fullscreen-grid, .ytp-fullscreen-grid-peeking, .ytp-suggested-action,
+  .ytp-cards-teaser, .ytp-cards-button, .iv-branding, .ytp-featured-product,
+  .ytp-autonav-endscreen-countdown-overlay, .ytp-paid-content-overlay
+) {
+  display: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   2. The one thing that stays: YouTube's own player, small and centred.
+   -------------------------------------------------------------------------- */
+
+/* Ancestors must not create a containing block for position: fixed. */
+html.fx-on.fx-watch :is(
+  ytd-app, #content.ytd-app, ytd-page-manager, ytd-watch-flexy, ytd-watch-flexy #columns,
+  ytd-watch-flexy #primary, ytd-watch-flexy #primary-inner, ytd-watch-flexy #player,
+  #full-bleed-container, #player-full-bleed-container, #player-container-outer,
+  #player-container-inner, #player-container, ytd-player, ytd-player #container
+) {
+  transform: none !important;
+  filter: none !important;
+  contain: none !important;
+  will-change: auto !important;
+  z-index: auto !important;
+}
+
+html.fx-on.fx-watch #movie_player {
+  visibility: visible !important;
+  position: fixed !important;
+  inset: auto !important;
+  top: var(--fx-top) !important;
+  left: calc(50vw - var(--fx-w) / 2) !important;
+  width: var(--fx-w) !important;
+  height: var(--fx-h) !important;
+  margin: 0 !important;
+  z-index: 10 !important;
+  border-radius: 6px;
+  overflow: hidden !important;
+  background: #000 !important;
+  box-shadow: 0 0 0 1px var(--fx-line), 0 40px 90px -30px rgba(0, 0, 0, 0.9);
+  transition: opacity 0.6s var(--fx-ease);
+}
+
+html.fx-on.fx-watch #movie_player .html5-video-container {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+html.fx-on.fx-watch #movie_player video.html5-main-video {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+}
+
+/* YouTube's own chrome over the video — our controls replace it. Ad
+   controls (.ytp-ad-module: Skip, countdown) are deliberately kept. */
+html.fx-on.fx-watch #movie_player :is(
+  .ytp-chrome-top, .ytp-chrome-bottom, .ytp-gradient-top, .ytp-gradient-bottom,
+  .ytp-bezel, .ytp-bezel-text-wrapper, .ytp-watermark, .ytp-tooltip,
+  .ytp-spinner-message, .ytp-player-content.ytp-iv-player-content, .ytp-overlay-bottom-right
+) {
+  display: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   3. Video off: cover art or plain dark over the (still playing) player.
+      html.fx-vcover / html.fx-vdark. Hidden during ads so YouTube's Skip
+      button and the ad blackout stay reachable.
+   -------------------------------------------------------------------------- */
+#fx-cover {
+  position: fixed;
+  top: var(--fx-top);
+  left: calc(50vw - var(--fx-w) / 2);
+  width: var(--fx-w);
+  height: var(--fx-h);
+  z-index: 11;
+  display: none;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #050505;
+  box-shadow: 0 0 0 1px var(--fx-line);
+  pointer-events: none; /* clicks still reach the player (play/pause) */
+}
+html.fx-on.fx-watch:is(.fx-vcover, .fx-vdark) #fx-cover { display: block; }
+html.fx-ad #fx-cover { display: none !important; }
+#fx-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.6s var(--fx-ease);
+}
+html.fx-vcover #fx-cover img.is-loaded { opacity: 1; }
+html.fx-vdark #fx-cover { background: #070707; }
+html.fx-vdark #fx-cover img { display: none; }
+html.fx-vdark #fx-back { display: none !important; }
+/* The video keeps playing for the audio; it just isn't painted. */
+html.fx-on.fx-watch:is(.fx-vcover, .fx-vdark):not(.fx-ad) #movie_player video.html5-main-video {
+  opacity: 0 !important;
+}
+
+/* --------------------------------------------------------------------------
+   4. Our layer
+   -------------------------------------------------------------------------- */
+#fx-back {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  display: none;
+  overflow: hidden;
+}
+html.fx-on.fx-watch.fx-ambient #fx-back { display: block; }
+#fx-back img {
+  position: absolute;
+  top: calc(var(--fx-top) - 40px);
+  left: calc(50vw - var(--fx-w) * 0.65);
+  width: calc(var(--fx-w) * 1.3);
+  height: calc(var(--fx-h) + 80px);
+  object-fit: cover;
+  filter: blur(90px) saturate(1.1);
+  opacity: 0;
+  transition: opacity 2s var(--fx-ease);
+}
+#fx-back img.is-loaded { opacity: 0.13; }
+
+#fx-ui {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+  font-family: var(--fx-font);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--fx-fg);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: 0.005em;
+}
+#fx-ui * { box-sizing: border-box; }
+#fx-ui :is(button, input, a) { pointer-events: auto; }
+#fx-ui [hidden] { display: none !important; }
+
+/* Focus off / fullscreen / pass-through pages: only the toggle survives. */
+html:not(.fx-on) #fx-ui > :not(.fx-focus) { display: none !important; }
+html.fx-fs #fx-ui, html.fx-fs #fx-back, html.fx-fs #fx-cover { display: none !important; }
+
+/* Zero specificity so component classes below win. */
+:where(#fx-ui) :where(button) {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+#fx-ui button:focus-visible,
+#fx-ui input:focus-visible,
+#fx-ui .fx-bar:focus-visible {
+  outline: 1px solid var(--fx-faint);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+#fx-ui svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#fx-ui svg .f { fill: currentColor; stroke: none; }
+
+/* Things that fade when the mouse rests. */
+.fx-fade { transition: opacity 0.9s var(--fx-ease); }
+html.fx-idle .fx-fade { opacity: 0 !important; }
+html.fx-idle, html.fx-idle * { cursor: none !important; }
+
+/* ---- corners ------------------------------------------------------------ */
+.fx-menu-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 48px;
+  height: 48px;
+  padding: 11px;
+  border-radius: 50%;
+  color: var(--fx-dim);
+  transition: color 0.2s, background 0.2s, opacity 0.9s var(--fx-ease);
+}
+.fx-menu-btn:hover, .fx-menu-btn[aria-expanded="true"] { color: var(--fx-fg); background: rgba(255, 255, 255, 0.04); }
+
+.fx-focus {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 20px;
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  color: var(--fx-dim);
+  transition: color 0.2s, background 0.2s, opacity 0.9s var(--fx-ease);
+}
+.fx-focus:hover { color: var(--fx-fg); background: rgba(255, 255, 255, 0.04); }
+.fx-focus .fx-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--fx-faint);
+  transition: background 0.3s, box-shadow 0.3s;
+}
+html.fx-enabled .fx-focus .fx-dot {
+  background: var(--fx-accent);
+  box-shadow: 0 0 12px rgba(169, 194, 180, 0.5);
+}
+/* Over normal YouTube the toggle becomes a small pill in the bottom corner. */
+html:not(.fx-on) .fx-focus {
+  top: auto;
+  bottom: 18px;
+  right: 18px;
+  background: rgba(15, 15, 15, 0.92);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+  color: rgba(233, 230, 224, 0.7);
+  opacity: 0.6;
+}
+html:not(.fx-on) .fx-focus:hover { opacity: 1; }
+
+/* ---- stage: everything under the video ---------------------------------- */
+.fx-stage {
+  position: absolute;
+  top: calc(var(--fx-top) + var(--fx-h) + 30px);
+  left: calc(50vw - var(--fx-w) / 2);
+  width: var(--fx-w);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+}
+html.fx-on.fx-watch .fx-stage { display: flex; }
+
+.fx-title {
+  max-width: 100%;
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  color: var(--fx-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 29px;
+}
+.fx-artist {
+  max-width: 100%;
+  margin-top: 4px;
+  font-size: 15px;
+  color: var(--fx-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 21px;
+}
+
+.fx-progress {
+  width: 100%;
+  margin-top: 26px;
+}
+.fx-bar {
+  position: relative;
+  height: 20px;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
+  --p: 0%;
+}
+.fx-bar::before,
+.fx-fill {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8.5px;
+  height: 3px;
+  border-radius: 2px;
+  transition: height 0.15s, top 0.15s;
+}
+.fx-bar::before { right: 0; background: rgba(255, 255, 255, 0.1); }
+.fx-fill { width: var(--p); background: rgba(233, 230, 224, 0.8); }
+.fx-knob {
+  position: absolute;
+  top: 4px;
+  left: var(--p);
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: var(--fx-fg);
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 0.15s, transform 0.15s;
+}
+.fx-bar:hover::before, .fx-bar:hover .fx-fill,
+.fx-bar.is-drag::before, .fx-bar.is-drag .fx-fill { top: 8px; height: 4px; }
+.fx-bar:hover .fx-knob, .fx-bar.is-drag .fx-knob, .fx-bar:focus-visible .fx-knob { opacity: 1; transform: none; }
+html.fx-ad .fx-bar { pointer-events: none; }
+html.fx-ad .fx-fill { background: var(--fx-faint); }
+
+.fx-times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--fx-faint);
+}
+.fx-times .fx-adlabel { color: var(--fx-dim); }
+
+.fx-controls {
+  display: flex;
+  align-items: center;
+  gap: 36px;
+  margin-top: 14px;
+}
+.fx-ctl {
+  width: 56px;
+  height: 56px;
+  padding: 14px;
+  border-radius: 50%;
+  color: var(--fx-dim);
+  transition: color 0.2s, background 0.2s, transform 0.2s var(--fx-ease);
+}
+.fx-ctl:hover { color: var(--fx-fg); background: rgba(255, 255, 255, 0.04); }
+.fx-ctl:active { transform: scale(0.92); }
+.fx-ctl.fx-play {
+  width: 76px;
+  height: 76px;
+  padding: 20px;
+  color: var(--fx-fg);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.fx-ctl.fx-play:hover { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2); }
+
+.fx-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-top: 16px;
+}
+.fx-act {
+  width: 46px;
+  height: 46px;
+  padding: 12px;
+  border-radius: 50%;
+  color: var(--fx-faint);
+  transition: color 0.2s, background 0.2s;
+}
+.fx-act:hover, .fx-act[aria-expanded="true"] { color: var(--fx-fg); background: rgba(255, 255, 255, 0.04); }
+.fx-heart.is-on { color: var(--fx-accent); }
+.fx-heart.is-on svg path { fill: currentColor; }
+.fx-heart.is-pop { animation: fx-pop 0.35s var(--fx-ease); }
+@keyframes fx-pop { 40% { transform: scale(1.25); } }
+.fx-vmode:not([data-mode="video"]) { color: var(--fx-dim); }
+
+/* ---- volume ------------------------------------------------------------- */
+.fx-volume {
+  position: absolute;
+  right: 22px;
+  bottom: 20px;
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+html.fx-on.fx-watch .fx-volume { display: flex; }
+.fx-vol-btn {
+  width: 44px;
+  height: 44px;
+  padding: 11px;
+  border-radius: 50%;
+  color: var(--fx-dim);
+  transition: color 0.2s, background 0.2s;
+}
+.fx-vol-btn:hover { color: var(--fx-fg); background: rgba(255, 255, 255, 0.04); }
+.fx-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 120px;
+  height: 22px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  --v: 100%;
+}
+.fx-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, rgba(233, 230, 224, 0.6) var(--v), rgba(255, 255, 255, 0.1) var(--v));
+}
+.fx-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  border-radius: 50%;
+  background: var(--fx-fg);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.fx-volume:hover .fx-range::-webkit-slider-thumb,
+.fx-range:focus-visible::-webkit-slider-thumb { opacity: 1; }
+.fx-range:focus-visible { outline: none !important; }
+
+/* ---- home / search page ------------------------------------------------- */
+.fx-home {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 6vh;
+}
+html.fx-on.fx-page .fx-home { display: flex; }
+html.fx-on.fx-results .fx-home { justify-content: flex-start; padding-top: 14vh; }
+
+.fx-word {
+  font-size: 13px;
+  letter-spacing: 0.42em;
+  text-indent: 0.42em;
+  text-transform: lowercase;
+  color: var(--fx-faint);
+  margin-bottom: 32px;
+}
+.fx-search {
+  pointer-events: auto;
+  width: min(480px, 84vw);
+}
+.fx-input {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px 4px;
+  font: inherit;
+  font-size: 20px;
+  color: var(--fx-fg);
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transition: border-color 0.3s;
+  pointer-events: auto;
+}
+.fx-input::placeholder { color: var(--fx-faint); }
+.fx-input::-webkit-search-cancel-button,
+.fx-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+.fx-input:focus { border-bottom-color: rgba(255, 255, 255, 0.24); }
+#fx-ui .fx-input:focus-visible { outline: none; }
+
+.fx-continue {
+  margin-top: 28px;
+  max-width: 84vw;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 15px;
+  color: var(--fx-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.2s, background 0.2s;
+}
+.fx-continue:hover { color: var(--fx-dim); background: rgba(255, 255, 255, 0.03); }
+.fx-continue b { font-weight: 400; color: var(--fx-dim); }
+.fx-continue:hover b { color: var(--fx-fg); }
+
+.fx-results-list {
+  pointer-events: auto;
+  width: min(600px, 88vw);
+  max-height: calc(100vh - 14vh - 170px);
+  margin-top: 34px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.fx-quiet {
+  margin-top: 30px;
+  font-size: 14px;
+  color: var(--fx-faint);
+  text-align: center;
+}
+
+/* now-playing line on pages other than /watch */
+.fx-now {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  gap: 10px;
+  max-width: 70vw;
+  color: var(--fx-dim);
+  font-size: 15px;
+}
+html.fx-on.fx-page .fx-now.is-on { display: flex; }
+.fx-now .fx-ctl { width: 44px; height: 44px; padding: 12px; }
+.fx-now-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.2s;
+}
+.fx-now-label:hover { color: var(--fx-fg); }
+
+/* ---- rows (results, library) --------------------------------------------- */
+.fx-row {
+  display: grid !important;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 11px 14px !important;
+  border-radius: 6px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.15s;
+}
+.fx-row:hover, .fx-row:focus-within { background: rgba(255, 255, 255, 0.04); }
+#fx-ui .fx-row-text { display: block; min-width: 0; text-align: left; }
+.fx-row-title, .fx-row-sub {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fx-row-title { font-size: 15.5px; color: rgba(233, 230, 224, 0.86); }
+.fx-row-sub { margin-top: 2px; font-size: 13.5px; color: var(--fx-faint); }
+.fx-row-meta { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--fx-faint); }
+.fx-row.is-current .fx-row-title { color: var(--fx-accent); }
+.fx-row-x {
+  width: 32px;
+  height: 32px;
+  padding: 8px;
+  border-radius: 50%;
+  color: var(--fx-faint);
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.fx-row:hover .fx-row-x, .fx-row-x:focus-visible { opacity: 1; }
+.fx-row-x:hover { color: var(--fx-fg); }
+
+/* ---- menu ---------------------------------------------------------------- */
+.fx-menu {
+  position: absolute;
+  top: 72px;
+  left: 38px;
+  display: flex;
+  flex-direction: column;
+  padding-left: 18px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  opacity: 0;
+  transform: translateY(-4px);
+  visibility: hidden;
+  transition: opacity 0.2s, transform 0.25s var(--fx-ease), visibility 0s 0.25s;
+}
+.fx-menu.is-open {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition: opacity 0.2s, transform 0.25s var(--fx-ease);
+}
+.fx-menu button {
+  padding: 8px 0;
+  font-size: 17px;
+  color: var(--fx-dim);
+  transition: color 0.15s;
+}
+.fx-menu button:hover, .fx-menu button.is-active { color: var(--fx-fg); }
+.fx-menu .fx-sep { height: 12px; }
+
+/* ---- panel --------------------------------------------------------------- */
+.fx-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(400px, 88vw);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 16px 18px;
+  background: rgba(10, 10, 10, 0.95);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid var(--fx-line);
+  pointer-events: auto;
+  transform: translateX(-102%);
+  visibility: hidden;
+  transition: transform 0.35s var(--fx-ease), visibility 0s 0.35s;
+}
+html.fx-panel-open .fx-panel {
+  transform: none;
+  visibility: visible;
+  transition: transform 0.35s var(--fx-ease);
+}
+html.fx-panel-open .fx-menu-btn { opacity: 0; pointer-events: none; }
+
+.fx-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 0 0 14px 4px;
+}
+.fx-panel-head .fx-act { flex: none; }
+.fx-panel-title {
+  flex: 1;
+  min-width: 0;
+  padding-left: 8px;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fx-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fx-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+}
+.fx-panel .fx-input { text-align: left; font-size: 16px; margin: 0 0 12px; padding: 12px 14px; }
+.fx-panel .fx-quiet { text-align: left; padding: 6px 14px; margin: 6px 0 0; }
+
+.fx-link {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 14px !important;
+  border-radius: 6px;
+  font-size: 16px;
+  color: var(--fx-dim);
+  transition: background 0.15s, color 0.15s;
+}
+.fx-link:hover { background: rgba(255, 255, 255, 0.04); color: var(--fx-fg); }
+.fx-link .fx-row-meta { margin-left: auto; }
+.fx-link.is-danger:hover { color: #d9a3a3; }
+
+.fx-switch-row {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 13px 14px !important;
+  border-radius: 6px;
+  font-size: 16px;
+  color: var(--fx-dim);
+  transition: background 0.15s, color 0.15s;
+}
+.fx-switch-row:hover { color: var(--fx-fg); background: rgba(255, 255, 255, 0.03); }
+.fx-switch {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.16);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.fx-switch::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--fx-faint);
+  transition: transform 0.2s var(--fx-ease), background 0.2s;
+}
+[aria-checked="true"] > .fx-switch { box-shadow: inset 0 0 0 1.5px rgba(169, 194, 180, 0.5); background: rgba(169, 194, 180, 0.08); }
+[aria-checked="true"] > .fx-switch::after { transform: translateX(16px); background: var(--fx-accent); }
+.fx-group { height: 1px; margin: 10px 14px; background: var(--fx-line); }
+.fx-hint { padding: 12px 14px; font-size: 13px; color: var(--fx-faint); }
+
+/* segmented choice (Settings → video) */
+.fx-seg-row { padding: 10px 14px 12px; }
+.fx-seg-label { font-size: 16px; color: var(--fx-dim); margin-bottom: 10px; }
+.fx-seg { display: flex; gap: 6px; }
+.fx-seg button {
+  flex: 1;
+  padding: 9px 0 !important;
+  border-radius: 6px;
+  font-size: 14px !important;
+  text-align: center;
+  color: var(--fx-faint);
+  box-shadow: inset 0 0 0 1px var(--fx-line);
+  transition: color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.fx-seg button:hover { color: var(--fx-fg); }
+.fx-seg button[aria-checked="true"] {
+  color: var(--fx-fg);
+  background: rgba(169, 194, 180, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(169, 194, 180, 0.45);
+}
+
+/* ---- popover: add to playlist --------------------------------------------- */
+.fx-pop {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  width: 280px;
+  margin-left: -140px;
+  padding: 6px;
+  background: #0e0e0e;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  z-index: 2;
+  pointer-events: auto;
+  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.8);
+}
+.fx-pop .fx-input { text-align: left; font-size: 15px; padding: 11px 14px; margin-top: 4px; border-bottom: 0; border-top: 1px solid var(--fx-line); }
+.fx-pop .fx-link { padding: 11px 14px !important; font-size: 15px; }
+.fx-pop .fx-link .is-in { color: var(--fx-accent); }
+
+/* ---- toast ---------------------------------------------------------------- */
+.fx-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  transform: translate(-50%, 6px);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  color: var(--fx-dim);
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s var(--fx-ease);
+}
+.fx-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---- small screens --------------------------------------------------------- */
+@media (max-height: 700px) {
+  html {
+    --fx-w: min(480px, 46vw, calc((100vh - 330px) * 16 / 9));
+    --fx-top: max(24px, calc((100vh - var(--fx-h) - 296px) / 2));
+  }
+  .fx-stage { top: calc(var(--fx-top) + var(--fx-h) + 18px); }
+  .fx-progress { margin-top: 14px; }
+  .fx-controls { margin-top: 6px; }
+  .fx-ctl.fx-play { width: 64px; height: 64px; padding: 17px; }
+  .fx-actions { margin-top: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #fx-ui *, #fx-back *, #fx-cover * { transition-duration: 0.01ms !important; animation: none !important; }
+}

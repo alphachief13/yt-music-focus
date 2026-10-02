@@ -1,0 +1,8 @@
+{
+  "uuid": "yt-focus@alphachief13",
+  "name": "Focus",
+  "description": "Mostra e controla no painel a música do Focus (extensão do Chrome para o YouTube): tocar/pausar, progresso, volume, curtidas, playlists, busca e modo de vídeo. A reprodução continua na aba do navegador.",
+  "shell-version": ["48", "49"],
+  "url": "https://github.com/alphachief13/yt-music-focus",
+  "version": 1
+}

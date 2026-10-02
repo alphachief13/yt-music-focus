@@ -1,0 +1,78 @@
+<!doctype html>
+<!-- Focus — high-fidelity mockup: a dark Chrome window around page.html. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Focus — mockup</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  body { font: 12px "Noto Sans", "Segoe UI", Roboto, sans-serif; color: #e3e3e3; }
+  .win { position: absolute; inset: 0; display: flex; flex-direction: column; background: #1f1f1f; }
+  .tabs { height: 40px; display: flex; align-items: flex-end; padding-left: 8px; background: #1f1f1f; }
+  .tab { position: relative; display: flex; align-items: center; gap: 8px; width: 238px; height: 32px; padding: 0 10px 0 12px; border-radius: 8px 8px 0 0; background: #353535; color: #e3e3e3; }
+  .tab .fav { width: 16px; height: 11px; border-radius: 3px; background: #ff0033; position: relative; flex: none; }
+  .tab .fav::after { content: ""; position: absolute; left: 6px; top: 3px; border: 2.5px solid transparent; border-left: 4px solid #fff; }
+  .tab .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; mask-image: linear-gradient(to right, #000 85%, transparent); }
+  .tab .x { width: 16px; height: 16px; opacity: .7; }
+  .newtab { width: 28px; height: 28px; margin: 0 0 2px 6px; opacity: .7; }
+  .winctl { margin-left: auto; display: flex; height: 40px; align-self: flex-start; }
+  .winctl svg { width: 46px; height: 40px; padding: 13px 16px; box-sizing: border-box; opacity: .75; }
+  .bar { height: 44px; display: flex; align-items: center; gap: 4px; padding: 0 8px; background: #353535; border-bottom: 1px solid #000; }
+  .bar .ib { width: 32px; height: 32px; padding: 8px; box-sizing: border-box; opacity: .8; }
+  .bar .ib.dim { opacity: .35; }
+  .omni { flex: 1; height: 34px; margin: 0 6px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 17px; background: #1f1f1f; font-size: 14px; }
+  .omni .lock { width: 14px; height: 14px; opacity: .7; }
+  .omni .host { color: #e3e3e3; }
+  .omni .path { color: #9a9a9a; }
+  .omni .star { margin-left: auto; width: 16px; height: 16px; opacity: .6; }
+  .ext { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; }
+  .ext img { width: 16px; height: 16px; }
+  .ext.pinned { background: rgba(255,255,255,.06); }
+  .avatar { width: 24px; height: 24px; margin: 0 4px; border-radius: 50%; background: linear-gradient(135deg, #6b7b9a, #3b4660); }
+  .page { flex: 1; border: 0; width: 100%; display: block; background: #0a0a0a; }
+  svg { fill: none; stroke: #e3e3e3; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+<div class="win">
+  <div class="tabs">
+    <div class="tab">
+      <span class="fav"></span><span class="name" id="tab-name">Arctic Monkeys - 505 (Official Audio) - YouTube</span>
+      <svg class="x" viewBox="0 0 16 16"><path d="M4.5 4.5l7 7m0-7-7 7"/></svg>
+    </div>
+    <svg class="newtab" viewBox="0 0 28 28"><path d="M14 8v12M8 14h12"/></svg>
+    <div class="winctl">
+      <svg viewBox="0 0 14 14"><path d="M2 7h10"/></svg>
+      <svg viewBox="0 0 14 14"><rect x="2.5" y="2.5" width="9" height="9" rx="1"/></svg>
+      <svg viewBox="0 0 14 14"><path d="M2.5 2.5l9 9m0-9-9 9"/></svg>
+    </div>
+  </div>
+  <div class="bar">
+    <svg class="ib" viewBox="0 0 16 16"><path d="M13 8H3m4-4L3 8l4 4"/></svg>
+    <svg class="ib dim" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+    <svg class="ib" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3"/></svg>
+    <div class="omni">
+      <svg class="lock" viewBox="0 0 16 16"><path d="M3 7h10v7H3zM5 7V5a3 3 0 0 1 6 0v2"/></svg>
+      <span><span class="host">youtube.com</span><span class="path" id="url-path">/watch?v=qU9mHegkTc4</span></span>
+      <svg class="star" viewBox="0 0 16 16"><path d="m8 1.8 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>
+    </div>
+    <div class="ext pinned" title="Focus"><img src="../icons/icon32.png" alt="Focus"></div>
+    <svg class="ib" viewBox="0 0 16 16"><path d="M3 5h3V3.5a1.5 1.5 0 0 1 3 0V5h3v3h-1.5a1.5 1.5 0 0 0 0 3H12v3H3z"/></svg>
+    <span class="avatar"></span>
+    <svg class="ib" viewBox="0 0 16 16"><path d="M8 3.5v.01M8 8v.01M8 12.5v.01" stroke-width="2.4"/></svg>
+  </div>
+  <iframe class="page" id="page" title="youtube.com"></iframe>
+</div>
+<script>
+  const scene = new URLSearchParams(location.search).get("scene") || "watch";
+  const map = {
+    home: ["YouTube", ""],
+    results: ["arctic monkeys - YouTube", "/results?search_query=arctic+monkeys"],
+  };
+  const [name, path] = map[scene] || ["Arctic Monkeys - 505 (Official Audio) - YouTube", "/watch?v=qU9mHegkTc4"];
+  document.getElementById("tab-name").textContent = name;
+  document.getElementById("url-path").textContent = path;
+  document.getElementById("page").src = `page.html?scene=${encodeURIComponent(scene)}`;
+</script>
+</body>
+</html>
