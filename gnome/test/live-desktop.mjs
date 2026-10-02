@@ -33,7 +33,7 @@ const profile = join(work, "profile");
 const hostDir = join(work, "host");
 mkdirSync(hostDir, { recursive: true });
 cpSync(join(REPO, "gnome/host/focus-host.js"), join(hostDir, "focus-host.js"));
-cpSync(join(REPO, "gnome/common/iface.js"), join(hostDir, "iface.js"));
+cpSync(join(REPO, "gnome/common"), join(work, "common"), { recursive: true }); // host imports ../common
 chmodSync(join(hostDir, "focus-host.js"), 0o755);
 const extId = execFileSync("bash", ["-c", `printf '%s' "$1" | sha256sum | cut -c1-32 | tr '0-9a-f' 'a-p'`, "_", ext]).toString().trim();
 mkdirSync(join(profile, "NativeMessagingHosts"), { recursive: true });
@@ -45,8 +45,8 @@ writeFileSync(join(profile, "NativeMessagingHosts", "io.github.alphachief13.focu
 const chrome = spawn(process.env.CHROME || "google-chrome", [
   "--headless=new", `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`,
   "--enable-unsafe-extension-debugging", "--remote-allow-origins=*",
-  "--window-size=1440,900", "--autoplay-policy=no-user-gesture-required", "--no-first-run", "about:blank",
-], { stdio: ["ignore", "ignore", "pipe"] });
+  "--window-size=1440,900", "--autoplay-policy=no-user-gesture-required", "--no-first-run", "--mute-audio", "about:blank",
+], { stdio: ["ignore", "ignore", "pipe"], env: { ...process.env, XDG_DATA_HOME: join(work, "data"), XDG_CACHE_HOME: join(work, "cache") } });
 let chromeLog = "";
 chrome.stderr.on("data", (d) => (chromeLog += d));
 

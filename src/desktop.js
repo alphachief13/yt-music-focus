@@ -76,6 +76,9 @@ const Desktop = (() => {
   }
 
   function disconnect(next = "off") {
+    // Tell the host this is on purpose, so it doesn't hand the song over to
+    // the local player as if the browser had closed.
+    post({ type: "bye" });
     if (port) {
       try { port.disconnect(); } catch (_) { /* already gone */ }
     }
@@ -196,6 +199,15 @@ const Desktop = (() => {
       case "removeFromPlaylist":
         playlists = playlists.map((p) => (p.id === a.id ? { ...p, ids: p.ids.filter((x) => x !== a.videoId) } : p));
         break;
+      case "played": {
+        // Played by the GNOME panel's local player while the browser was closed.
+        const s = songFrom(a.track);
+        if (!s) return;
+        songs[s.id] = { ...s, playedAt: Date.now() };
+        const next = [s.id, ...recent.filter((x) => x !== s.id)].slice(0, 50);
+        await save({ songs: prune(songs, next, playlists), playlists, recent: next });
+        return;
+      }
       default:
         return;
     }
@@ -363,7 +375,12 @@ const Desktop = (() => {
     }
   });
 
-  chrome.tabs.onRemoved.addListener(forgetTab);
+  // When a whole window closes, wait a bit: if it was the browser quitting,
+  // the host must still see the song as playing to hand it to the local player.
+  chrome.tabs.onRemoved.addListener((tabId, info) => {
+    if (info?.isWindowClosing) setTimeout(() => forgetTab(tabId), 3000);
+    else forgetTab(tabId);
+  });
   chrome.tabs.onUpdated.addListener((tabId, info) => {
     if (info.url && !/^https:\/\/www\.youtube\.com\//.test(info.url)) forgetTab(tabId);
   });

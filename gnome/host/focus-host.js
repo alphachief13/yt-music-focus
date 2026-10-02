@@ -5,20 +5,27 @@
 // user enabled the desktop integration). It relays between:
 //   stdin/stdout  — Chrome native messaging (uint32 length + JSON)
 //   D-Bus         — io.github.alphachief13.YtFocus, consumed by the panel
-// and caches cover thumbnails under ~/.cache/yt-focus/thumbs.
+// It also keeps ~/.local/share/yt-focus/{library,session}.json up to date, so
+// the local player (daemon/main.js) can carry on when the browser closes:
+//   - browser exits while a song plays -> starts the local player (--resume)
+//   - local player playing when the browser opens -> waits; takes the panel
+//     back (D-Bus REPLACE) only when a Focus tab starts playing
+//   - edits made without the browser (pending.json) go to the browser here
 //
 // stdout is the protocol channel: never print to it. Logs go to stderr.
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import GioUnix from 'gi://GioUnix';
 import GLibUnix from 'gi://GLibUnix';
-import Soup from 'gi://Soup?version=3.0';
 import System from 'system';
 
-import {IFACE_XML, BUS_NAME, OBJECT_PATH} from './iface.js';
+import {IFACE_XML, BUS_NAME, OBJECT_PATH} from '../common/iface.js';
+import {readJson, writeJson, takePending, normalizeLibrary} from '../common/store.js';
+import {ensureThumb, thumbNow} from '../common/thumbs.js';
 
-Gio._promisify(Soup.Session.prototype, 'send_and_read_async');
-Gio._promisify(Gio.File.prototype, 'replace_contents_bytes_async', 'replace_contents_finish');
+const HERE = GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]);
+const PLAYER = GLib.canonicalize_filename(GLib.build_filenamev([HERE, '..', 'daemon', 'main.js']), null);
+
 Gio._promisify(Gio.InputStream.prototype, 'read_bytes_async');
 
 const log = (...a) => printerr(`focus-host: ${a.join(' ')}`);
@@ -95,58 +102,11 @@ async function readLoop() {
 }
 
 // ---------------------------------------------------------------------------
-// Covers
-// ---------------------------------------------------------------------------
-const THUMB_DIR = GLib.build_filenamev([GLib.get_user_cache_dir(), 'yt-focus', 'thumbs']);
-GLib.mkdir_with_parents(THUMB_DIR, 0o700);
-const http = new Soup.Session({timeout: 15});
-const pendingThumbs = new Map();
-
-const thumbPath = id => GLib.build_filenamev([THUMB_DIR, `${id}.jpg`]);
-
-function ensureThumb(id) {
-    if (!ID_RE.test(id || ''))
-        return Promise.resolve('');
-    const path = thumbPath(id);
-    if (GLib.file_test(path, GLib.FileTest.EXISTS))
-        return Promise.resolve(path);
-    if (pendingThumbs.has(id))
-        return pendingThumbs.get(id);
-    const p = (async () => {
-        try {
-            const msg = Soup.Message.new('GET', `https://i.ytimg.com/vi/${id}/mqdefault.jpg`);
-            const bytes = await http.send_and_read_async(msg, GLib.PRIORITY_LOW, null);
-            if (msg.get_status() !== Soup.Status.OK || bytes.get_size() === 0)
-                return '';
-            await Gio.File.new_for_path(path).replace_contents_bytes_async(
-                bytes, null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null);
-            return path;
-        } catch (e) {
-            log(`cover ${id}: ${e.message}`);
-            return '';
-        } finally {
-            pendingThumbs.delete(id);
-        }
-    })();
-    pendingThumbs.set(id, p);
-    return p;
-}
-
-/** Path if cached; otherwise starts the download and calls `later` when done. */
-function thumbNow(id, later) {
-    if (!ID_RE.test(id || ''))
-        return '';
-    const path = thumbPath(id);
-    if (GLib.file_test(path, GLib.FileTest.EXISTS))
-        return path;
-    ensureThumb(id).then(p => p && later());
-    return '';
-}
-
-// ---------------------------------------------------------------------------
 // State relayed to the panel
 // ---------------------------------------------------------------------------
 let state = null;     // last tab state from Chrome
+let stateAt = 0;      // when it arrived (to estimate the position at exit)
+let bye = false;      // the browser turned the bridge off on purpose
 let library = {liked: [], playlists: [], recent: []};
 let searchSeq = 0;
 const searches = new Map();
@@ -167,9 +127,10 @@ const debounce = (fn, ms) => {
 function stateJson() {
     const s = state;
     if (!s?.id)
-        return JSON.stringify({connected: true, track: null, status: 'idle', videoMode: s?.videoMode ?? 'video', focus: s?.focus ?? true});
+        return JSON.stringify({connected: true, backend: 'browser', track: null, status: 'idle', videoMode: s?.videoMode ?? 'video', focus: s?.focus ?? true});
     return JSON.stringify({
         connected: true,
+        backend: 'browser',
         track: {
             videoId: s.id,
             title: String(s.title || ''),
@@ -209,13 +170,22 @@ function onChrome(m) {
     case 'hello':
         log(`connected (extension ${m.version})`);
         break;
+    case 'bye':
+        bye = true;
+        break;
     case 'state':
         state = m.state && typeof m.state === 'object' ? m.state : null;
+        stateAt = GLib.get_monotonic_time();
+        if (state?.id && state.playing && !owned)
+            ownName(); // a Focus tab plays: take the panel back from the local player
+        saveSessionSoon();
+        saveMirror();
         emitState();
         break;
     case 'library':
         if (m.library && typeof m.library === 'object')
             library = m.library;
+        saveMirror();
         emitLibrary();
         break;
     case 'results': {
@@ -224,6 +194,82 @@ function onChrome(m) {
             done(m);
         break;
     }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Files for the local player
+// ---------------------------------------------------------------------------
+function estimatedPosition() {
+    let pos = Number(state?.position) || 0;
+    if (state?.playing && !state.ad)
+        pos += (GLib.get_monotonic_time() - stateAt) / 1e6;
+    const d = Number(state?.duration) || 0;
+    return d > 0 ? Math.min(pos, d) : pos;
+}
+
+function saveSession() {
+    if (!owned || !state?.id)
+        return;
+    const prev = readJson('session.json', {}) || {};
+    writeJson('session.json', {
+        videoId: state.id,
+        title: String(state.title || ''),
+        artist: String(state.artist || ''),
+        duration: Number(state.duration) || 0,
+        position: Math.floor(estimatedPosition()),
+        playing: !!state.playing,
+        queue: Array.isArray(state.queue) ? state.queue : [],
+        volume: state.muted ? 0 : Number(state.volume) || prev.volume || 70,
+        at: Date.now(),
+        by: 'browser',
+    });
+}
+const saveSessionSoon = debounce(saveSession, 2000);
+
+function saveMirror() {
+    const lib = normalizeLibrary({
+        ...library,
+        settings: {videoMode: state?.videoMode, focus: state?.focus},
+    });
+    if (!state) {
+        // keep the last known settings
+        const old = readJson('library.json', null);
+        if (old?.settings)
+            lib.settings = normalizeLibrary(old).settings;
+    }
+    writeJson('library.json', lib);
+}
+
+/** Edits made in the panel without the browser: replay them in the browser. */
+function flushPending() {
+    const ops = takePending();
+    for (const op of ops) {
+        if (op.op === 'setting' && op.key === 'videoMode')
+            cmd('videoMode', {mode: op.value});
+        else if (op.op === 'setting' && op.key === 'focus')
+            cmd('focus', {on: !!op.value});
+        else if (op.op)
+            cmd('lib', op);
+    }
+    if (ops.length)
+        log(`synced ${ops.length} edit(s) made without the browser`);
+}
+
+/** The browser is going away mid-song: let the local player carry on. */
+function handOff() {
+    if (bye || !owned || !state?.id || !state.playing)
+        return;
+    if (!GLib.file_test(PLAYER, GLib.FileTest.EXISTS))
+        return;
+    saveSession();
+    try {
+        // setsid: the player must outlive this process (Chrome kills its hosts).
+        Gio.Subprocess.new(['setsid', '-f', 'gjs', '-m', PLAYER, '--resume'],
+            Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE);
+        log('browser closed: local player takes over');
+    } catch (e) {
+        log(`could not start the local player: ${e.message}`);
     }
 }
 
@@ -292,6 +338,8 @@ const impl = {
     SetVideoMode: mode => ['video', 'cover', 'dark'].includes(mode) && cmd('videoMode', {mode}),
     SetFocus: on => cmd('focus', {on}),
     ShowBrowser: () => cmd('showBrowser'),
+    ShowWindow: () => cmd('showBrowser'),
+    Quit: () => {},
 };
 
 // ---------------------------------------------------------------------------
@@ -299,8 +347,14 @@ const impl = {
 // ---------------------------------------------------------------------------
 const loop = new GLib.MainLoop(null, false);
 let ownerId = 0;
+let owned = false;
+let quitting = false;
 
 function quit() {
+    if (quitting)
+        return;
+    quitting = true;
+    handOff();
     if (ownerId)
         Gio.bus_unown_name(ownerId);
     ownerId = 0;
@@ -308,13 +362,49 @@ function quit() {
 }
 
 dbus = Gio.DBusExportedObject.wrapJSObject(IFACE_XML, impl);
-ownerId = Gio.bus_own_name(
-    Gio.BusType.SESSION, BUS_NAME,
-    // Several browsers/profiles: the most recent connection takes the panel.
-    Gio.BusNameOwnerFlags.ALLOW_REPLACEMENT | Gio.BusNameOwnerFlags.REPLACE,
-    conn => dbus.export(conn, OBJECT_PATH),
-    () => emitState(),
-    () => log('lost the D-Bus name (another browser took over)'));
+
+function ownName() {
+    if (ownerId)
+        return;
+    ownerId = Gio.bus_own_name(
+        Gio.BusType.SESSION, BUS_NAME,
+        // REPLACE: takes over from the local player or another browser profile.
+        Gio.BusNameOwnerFlags.ALLOW_REPLACEMENT | Gio.BusNameOwnerFlags.REPLACE,
+        conn => dbus.export(conn, OBJECT_PATH),
+        () => {
+            owned = true;
+            emitState();
+            emitLibrary();
+            // The local player saves its last edits as it exits.
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
+                flushPending();
+                return GLib.SOURCE_REMOVE;
+            });
+        },
+        () => {
+            if (owned)
+                log('lost the D-Bus name (another browser took over)');
+            owned = false;
+        });
+}
+
+// If the local player is already playing, don't cut it off just because the
+// browser opened: wait until a Focus tab actually plays (see onChrome).
+function nameHasOwner() {
+    try {
+        const [has] = Gio.DBus.session.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus',
+            'org.freedesktop.DBus', 'NameHasOwner', new GLib.Variant('(s)', [BUS_NAME]),
+            new GLib.VariantType('(b)'), Gio.DBusCallFlags.NONE, 2000, null).deepUnpack();
+        return has;
+    } catch (_) {
+        return false;
+    }
+}
+
+if (nameHasOwner())
+    log('local player active: waiting for a Focus tab to play');
+else
+    ownName();
 
 onSignal(15, () => {
     quit();

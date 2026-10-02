@@ -1173,6 +1173,7 @@
       ad: S.ad,
       volume: S.bridge ? Math.round(S.bridge.volume) : 100,
       muted: !!S.bridge?.muted,
+      queue: getCtx()?.ids || [],
     };
     const { position, ...rest } = st;
     const key = JSON.stringify(rest);

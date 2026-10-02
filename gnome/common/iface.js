@@ -1,6 +1,7 @@
-// D-Bus interface shared by the native host (host/focus-host.js) and the
-// GNOME Shell extension (extension/extension.js). JSON over strings keeps the
-// interface small and lets the payload follow the Chrome side.
+// D-Bus interface shared by the native host (host/focus-host.js), the local
+// player (daemon/main.js) and the GNOME Shell extension (extension/extension.js).
+// Whoever owns the name answers; state JSON carries `backend: "browser" | "local"`.
+// JSON over strings keeps the interface small and follows the Chrome side.
 export const BUS_NAME = 'io.github.alphachief13.YtFocus';
 export const OBJECT_PATH = '/io/github/alphachief13/YtFocus';
 
@@ -41,6 +42,8 @@ export const IFACE_XML = `
     <method name="SetVideoMode"><arg type="s" direction="in" name="mode"/></method>
     <method name="SetFocus"><arg type="b" direction="in" name="on"/></method>
     <method name="ShowBrowser"/>
+    <method name="ShowWindow"/>
+    <method name="Quit"/>
     <signal name="StateChanged"><arg type="s" name="json"/></signal>
     <signal name="LibraryChanged"><arg type="s" name="json"/></signal>
   </interface>

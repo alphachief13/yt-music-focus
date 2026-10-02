@@ -36,6 +36,26 @@ export default class SnapExtension extends Extension {
                 console.log('ytf-snap: indicator missing');
                 return;
             }
+            if (GLib.getenv('YTF_SNAP_MODE') === 'local') {
+                // No browser: opening the menu must start the local player.
+                ind.menu.open();
+                for (let i = 0; i < 40 && !ind._online; i++)
+                    await wait(500);
+                console.log(`ytf-snap: player online=${ind._online}`);
+                ind._call('Toggle'); // continue the saved session
+                for (let i = 0; i < 160 && ind._state?.status !== 'playing'; i++)
+                    await wait(500);
+                await wait(3000);
+                const st = ind._state ?? {};
+                console.log(`ytf-snap: local status=${st.status} backend=${st.backend} pos=${Math.round(st.position ?? 0)} label="${ind._statusLabel.text}"`);
+                ind._setView({name: 'liked'});
+                await wait(700);
+                await shot(dir, 'panel-local');
+                ind._call('Quit');
+                await wait(1500);
+                console.log('ytf-snap: done');
+                return;
+            }
             await shot(dir, 'panel-closed');
             ind.menu.open();
             await wait(1200);

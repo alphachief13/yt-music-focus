@@ -64,6 +64,12 @@ Uma versão do yt-pod que espelha o Focus em vez de tocar o YouTube Music por co
 - busca no YouTube, sem mexer na aba;
 - modo de vídeo (vídeo/capa/escuro) e Focus liga/desliga.
 
+**Sem o navegador:** com o painel ativo, fechar o navegador no meio de uma música não para o som. Um player escondido (o motor do yt-pod: WebKitGTK no youtube.com, com o mesmo `src/ads.js` para os anúncios) continua a mesma música, do mesmo ponto, com a mesma fila. Pelo painel dá para tocar, buscar, curtir e mexer em playlists sem abrir o navegador. Abrir o painel sem navegador também inicia esse player, parado na última música.
+
+Quando você abre o navegador de novo, o player escondido continua tocando até uma aba do Focus começar a tocar. Aí o painel volta para a aba, o player para (sem som duplicado) e as curtidas, playlists e recentes feitas sem o navegador entram na biblioteca do Focus. Sem uso por 15 minutos, o player fecha sozinho para liberar memória (uns 300–500 MB enquanto toca). Ele não usa o login do Chrome; o botão 👤 do painel abre uma janela para entrar no YouTube, se você quiser.
+
+Isso só existe com o painel instalado e ligado, e precisa de `webkitgtk6.0` e `gstreamer1-plugin-libav`. Sem eles, o `install.sh` pula o player e o painel só espelha o navegador.
+
 O clique do meio no ícone toca/pausa e a roda do mouse muda o volume. Tocar algo pelo painel navega a aba do Focus, ou abre uma se não houver.
 
 É **escolhível**: vem desligado, e o Focus funciona igual sem ele, em qualquer sistema. Para ligar:
@@ -83,7 +89,9 @@ Testes, ambos isolados (D-Bus privado, perfil temporário do Chrome e um GNOME S
 
 ```bash
 dbus-run-session -- node gnome/test/live-desktop.mjs   # Chrome + host + D-Bus no youtube.com real
-gnome/test/panel-shots.sh                              # screenshots do painel em gnome/test/shots/
+dbus-run-session -- node gnome/test/live-handoff.mjs   # fecha/abre o Chrome: passagem para o player e volta
+gnome/test/player.sh                                   # player escondido sozinho (mudo)
+gnome/test/panel-shots.sh [--local]                    # screenshots do painel em gnome/test/shots/
 ```
 
 ## Instalação
@@ -106,7 +114,7 @@ src/shared.js       settings, storage, i18n (pt/en), parsing de título
 src/ads.js/.css     yt-ads-sucks
 src/focus.js/.css   a interface e a biblioteca
 mockup/             mockup de alta fidelidade + teste ao vivo
-gnome/              painel do GNOME: extension/, host/, common/iface.js, install.sh, test/
+gnome/              painel do GNOME: extension/, host/, daemon/ (player sem navegador), common/, install.sh, test/
 ```
 
 Os content scripts rodam num mundo isolado e não conseguem chamar `#movie_player.playVideo()`. Por isso o `bridge.js` roda no mundo da página e conversa com eles via `postMessage`, restrito à mesma origem e a uma lista fixa de comandos.

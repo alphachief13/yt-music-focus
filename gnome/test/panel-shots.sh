@@ -2,7 +2,8 @@
 # Screenshots of the GNOME panel, rendered by a headless GNOME Shell on a
 # private D-Bus with throwaway XDG dirs (your session and settings are not
 # touched). Output: gnome/test/shots/panel-*.png
-#   gnome/test/panel-shots.sh
+#   gnome/test/panel-shots.sh           # panel mirroring a (fake) browser
+#   gnome/test/panel-shots.sh --local   # no browser: panel starts the local player
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d)"
@@ -26,6 +27,19 @@ EOF
 
 "$ROOT/install.sh" >/dev/null
 cp -r "$ROOT/test/snap@ytf-test" "$XDG_DATA_HOME/gnome-shell/extensions/"
+
+if [[ "${1:-}" == "--local" ]]; then
+  # No browser at all: the panel starts the local player (muted) by itself.
+  export YTF_SNAP_MODE=local YTFOCUS_TEST_MUTE=1
+  echo '{"videoId":"qU9mHegkTc4","title":"505","artist":"Arctic Monkeys","duration":253,"position":95,"queue":[],"volume":60}' \
+    > "$XDG_DATA_HOME/yt-focus/session.json"
+  echo '{"liked":[{"videoId":"qU9mHegkTc4","title":"505","artist":"Arctic Monkeys","duration":253},{"videoId":"GCdwKhTtNNw","title":"Sweater Weather","artist":"The Neighbourhood","duration":240}],"playlists":[],"recent":[],"settings":{"videoMode":"video","focus":true}}' \
+    > "$XDG_DATA_HOME/yt-focus/library.json"
+  dbus-run-session -- timeout 130 gnome-shell --headless --wayland --no-x11 --wayland-display=wayland-ytf-test \
+    --virtual-monitor 1440x900 > "$TMP/shell.log" 2>&1 || true
+  grep -E "ytf-snap|JS ERROR" "$TMP/shell.log" | head
+  exit 0
+fi
 
 dbus-run-session -- bash -c '
   python3 "$1/test/fake-browser.py" "$XDG_DATA_HOME/yt-focus/host/focus-host.js" > "$2/fake.log" 2>&1 &

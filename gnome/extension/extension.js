@@ -1,8 +1,11 @@
 // Focus — GNOME panel for the Focus Chrome extension.
 //
-// Mirrors what the Focus tab is playing and controls it. There is no player
-// here: the native host (host/focus-host.js), started by the browser when the
-// desktop integration is enabled, relays state/commands over D-Bus.
+// Mirrors what the Focus tab is playing and controls it, over D-Bus. Two
+// processes can answer, with the same interface:
+//   - the native host (host/focus-host.js), started by the browser: the
+//     YouTube tab plays;
+//   - the local player (daemon/main.js), when the browser is closed: a hidden
+//     WebKit view plays (yt-pod's engine). This panel starts it on demand.
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
@@ -34,6 +37,8 @@ const T = PT ? {
     songs: n => `${n} música${n === 1 ? '' : 's'}`, likedN: n => `${n} curtida${n === 1 ? '' : 's'}`,
     ad: 'Anúncio silenciado e pulando…', adStatus: 'Pulando anúncio…',
     connected: 'Focus · navegador conectado', offlineStatus: 'Ative o painel nos ajustes do Focus',
+    local: 'Tocando sem o navegador', starting: 'Iniciando o player…', login: 'Entrar no YouTube (opcional)',
+    toBrowser: 'Continuar no navegador',
     play: 'Tocar', pause: 'Pausar', prev: 'Anterior', next: 'Próxima', like: 'Curtir', unlike: 'Descurtir',
     shuffle: 'Tocar aleatório', playAll: 'Tocar tudo', del: 'Apagar playlist', back: 'Voltar',
     remove: 'Remover da playlist', addTo: 'Adicionar a uma playlist', browser: 'Abrir a aba do Focus',
@@ -51,6 +56,8 @@ const T = PT ? {
     songs: n => `${n} song${n === 1 ? '' : 's'}`, likedN: n => `${n} liked`,
     ad: 'Ad muted and skipping…', adStatus: 'Skipping ad…',
     connected: 'Focus · browser connected', offlineStatus: 'Enable the panel in Focus settings',
+    local: 'Playing without the browser', starting: 'Starting the player…', login: 'Sign in to YouTube (optional)',
+    toBrowser: 'Continue in the browser',
     play: 'Play', pause: 'Pause', prev: 'Previous', next: 'Next', like: 'Like', unlike: 'Unlike',
     shuffle: 'Shuffle', playAll: 'Play all', del: 'Delete playlist', back: 'Back',
     remove: 'Remove from playlist', addTo: 'Add to a playlist', browser: 'Open the Focus tab',
@@ -59,6 +66,7 @@ const T = PT ? {
 };
 
 const MODES = ['video', 'cover', 'dark'];
+const PLAYER = GLib.build_filenamev([GLib.get_user_data_dir(), 'yt-focus', 'daemon', 'main.js']);
 const MODE_ICON = {video: 'video-display-symbolic', cover: 'image-x-generic-symbolic', dark: 'weather-clear-night-symbolic'};
 
 function fmtTime(sec) {
@@ -133,6 +141,7 @@ class FocusIndicator extends PanelMenu.Button {
         this._seeking = false;
         this._searchSeq = 0;
         this._tickId = 0;
+        this._spawned = false;
 
         const box = new St.BoxLayout({style_class: 'panel-status-menu-box'});
         this._panelIcon = new St.Icon({gicon: fileIcon('ytfocus-symbolic'), style_class: 'system-status-icon ytf-panel-icon'});
@@ -157,6 +166,7 @@ class FocusIndicator extends PanelMenu.Button {
 
         this.menu.connect('open-state-changed', (_m, open) => {
             if (open) {
+                this._ensurePlayer();
                 this._renderList();
                 this._startTick();
                 if (this._view.name === 'search')
@@ -195,7 +205,43 @@ class FocusIndicator extends PanelMenu.Button {
         return !!this._proxy?.g_name_owner;
     }
 
+    get _hasPlayer() {
+        return GLib.file_test(PLAYER, GLib.FileTest.EXISTS);
+    }
+
+    /** Nobody answering (browser closed): start the local player, idle. */
+    _ensurePlayer() {
+        if (this._online || this._spawned || !this._hasPlayer)
+            return;
+        this._spawned = true;
+        this._updateNowPlaying();
+        try {
+            const proc = Gio.Subprocess.new(['gjs', '-m', PLAYER], Gio.SubprocessFlags.NONE);
+            proc.wait_async(null, () => {
+                this._spawned = false;
+                this._updateNowPlaying();
+            });
+        } catch (e) {
+            this._spawned = false;
+            console.warn(`yt-focus: start player: ${e.message}`);
+        }
+    }
+
+    // Waits for the player to show up on D-Bus right after starting it.
+    async _waitOnline(timeoutMs = 20000) {
+        for (let t = 0; t < timeoutMs && !this._online && this._proxy && this._spawned; t += 200) {
+            await new Promise(r => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 200, () => {
+                r();
+                return GLib.SOURCE_REMOVE;
+            }));
+        }
+    }
+
     async _call(method, ...args) {
+        if (!this._online) {
+            this._ensurePlayer();
+            await this._waitOnline();
+        }
         if (!this._online)
             return null;
         try {
@@ -209,6 +255,8 @@ class FocusIndicator extends PanelMenu.Button {
     async _onOwner() {
         if (!this._proxy)
             return;
+        if (this._online)
+            this._spawned = false;
         if (!this._online) {
             this._state = null;
             this._updateNowPlaying();
@@ -260,7 +308,7 @@ class FocusIndicator extends PanelMenu.Button {
         const ids = tracks.map(t => t.videoId).filter(id => ID_RE.test(id));
         if (!ids.length)
             return;
-        if (this._online)
+        if (this._online || this._hasPlayer)
             this._call('Play', JSON.stringify(ids), index);
         else
             this._openInBrowser(ids[index] ?? ids[0]);
@@ -322,7 +370,7 @@ class FocusIndicator extends PanelMenu.Button {
         this._playBtn = iconButton('media-playback-start-symbolic', 'ytf-play', T.play, () => this._call('Toggle'));
         this._nextBtn = iconButton('media-skip-forward-symbolic', '', T.next, () => this._call('Next'));
         this._browserBtn = iconButton('web-browser-symbolic', '', T.browser, () => {
-            if (this._online) {
+            if (this._online || this._spawned) {
                 this._call('ShowBrowser');
                 this.menu.close();
             } else {
@@ -401,6 +449,11 @@ class FocusIndicator extends PanelMenu.Button {
         const footer = new St.BoxLayout({style_class: 'ytf-footer'});
         this._statusLabel = label('', 'ytf-status', {x_expand: true});
         footer.add_child(this._statusLabel);
+        this._loginBtn = iconButton('avatar-default-symbolic', 'ytf-small', T.login, () => {
+            this.menu.close();
+            this._call('ShowWindow');
+        });
+        footer.add_child(this._loginBtn);
         this._focusBtn = iconButton('view-reveal-symbolic', 'ytf-small ytf-toggle', T.focusOn,
             () => this._call('SetFocus', !(this._state?.focus ?? true)));
         footer.add_child(this._focusBtn);
@@ -457,17 +510,21 @@ class FocusIndicator extends PanelMenu.Button {
         const s = online ? this._state : null;
         const t = s?.track;
         const ad = s?.status === 'ad';
-        const playing = s?.status === 'playing' || ad;
+        const playing = s?.status === 'playing' || s?.status === 'loading' || ad;
 
+        const local = s?.backend === 'local';
         if (!online)
-            this._statusLabel.text = T.offlineStatus;
+            this._statusLabel.text = this._spawned ? T.starting : T.offlineStatus;
         else if (ad)
             this._statusLabel.text = `🔇 ${T.adStatus}`;
         else
-            this._statusLabel.text = T.connected;
+            this._statusLabel.text = local ? T.local : T.connected;
+        this._loginBtn.visible = online && local;
+        this._browserBtn.accessible_name = local ? T.toBrowser : T.browser;
 
-        this._title.text = t?.title || (online ? T.nothing : T.offline);
-        this._artist.text = ad ? T.ad : t ? t.artist || '' : online ? T.nothingSub : T.offlineSub;
+        const waiting = online || this._spawned;
+        this._title.text = t?.title || (waiting ? T.nothing : T.offline);
+        this._artist.text = ad ? T.ad : t ? t.artist || '' : waiting ? T.nothingSub : T.offlineSub;
         this._artist.style_class = ad ? 'ytf-artist ytf-ad' : 'ytf-artist';
         if (this._coverFile !== (t?.thumbFile ?? '')) {
             this._coverFile = t?.thumbFile ?? '';
@@ -534,7 +591,7 @@ class FocusIndicator extends PanelMenu.Button {
         const q = this._searchEntry.text.trim();
         if (!q)
             return;
-        if (!this._online) {
+        if (!this._online && !this._hasPlayer) {
             this._resultsError = T.needBrowser;
             this._results = [];
             this._renderList();
@@ -659,7 +716,7 @@ class FocusIndicator extends PanelMenu.Button {
                     this._call('Like', JSON.stringify(t));
             });
             setChecked(like, liked);
-            like.reactive = this._online;
+            like.reactive = this._online || this._hasPlayer;
             row.add_child(like);
 
             if (playlistId) {
@@ -668,7 +725,7 @@ class FocusIndicator extends PanelMenu.Button {
             } else {
                 const add = iconButton('list-add-symbolic', 'ytf-small', T.addTo,
                     () => this._setView({name: 'pick', track: t, from: this._view.name}));
-                add.reactive = this._online;
+                add.reactive = this._online || this._hasPlayer;
                 row.add_child(add);
             }
             this._list.add_child(row);
@@ -689,7 +746,7 @@ class FocusIndicator extends PanelMenu.Button {
             hint_text: T.newPlaylist,
             can_focus: true,
             x_expand: true,
-            reactive: this._online,
+            reactive: this._online || this._hasPlayer,
             primary_icon: new St.Icon({icon_name: 'list-add-symbolic', style_class: 'ytf-search-icon'}),
         });
         entry.clutter_text.connect('activate', async () => {
