@@ -1055,15 +1055,16 @@
         switchRow("adBlackout", t("sAdBlackout")),
         switchRow("adSkip", t("sAdSkip")),
         h("div", { class: "fx-group" }),
-        link(t("sDesktop"), cache.settings.desktop ? t("on") : t("off"), () => {
-          try { chrome.runtime.sendMessage({ fx: "options" }); } catch (_) { /* reloaded */ }
-        }),
+        switchRow("desktop", t("sDesktop")),
+        (E.deskStatus = h("div", { class: "fx-hint fx-desk-status", role: "status", "aria-live": "polite" })),
         h("div", { class: "fx-group" }),
         link(t("export"), null, exportLibrary),
         link(t("import"), null, () => E.file.click()),
         h("div", { class: "fx-hint", text: t("shortcut") }),
       ];
     }
+
+    if (v === "settings") queueMicrotask(refreshDesktopStatus);
 
     // Keep focus on the filter input across re-renders.
     const hadFocus = document.activeElement?.closest?.(".fx-panel") && document.activeElement.matches("input");
@@ -1113,6 +1114,37 @@
     if (E.pop) E.pop.replaceWith(pop);
     else E.actions.append(pop);
     E.pop = pop;
+  }
+
+  /** Settings → desktop panel: shows whether the GNOME side answers. */
+  function refreshDesktopStatus() {
+    const el = E.deskStatus;
+    if (!el || !el.isConnected) return;
+    if (!cache.settings.desktop) return (el.textContent = t("deskOffHint"));
+    if (!alive()) return (el.textContent = t("reloadPage"));
+    el.textContent = t("deskConnecting");
+    try {
+      chrome.runtime.sendMessage({ fx: "desktopRetry" }).then((r) => {
+        if (!el.isConnected) return;
+        if (r?.status === "connected") el.textContent = t("deskOk");
+        else if (r?.status === "connecting") { el.textContent = t("deskConnecting"); setTimeout(refreshDesktopStatus, 1500); }
+        else el.textContent = t("deskMissing");
+      }, () => (el.textContent = t("reloadPage")));
+    } catch (_) {
+      el.textContent = t("reloadPage");
+    }
+  }
+
+  /** Opens the options page via the service worker. If the extension was
+   *  reloaded after this tab loaded, this page lost its connection: say so. */
+  function openOptions() {
+    const stale = () => toast(t("reloadPage"));
+    if (!alive()) return stale();
+    try {
+      chrome.runtime.sendMessage({ fx: "options" }).then((r) => { if (!r?.ok) stale(); }, stale);
+    } catch (_) {
+      stale();
+    }
   }
 
   let toastTimer = 0;

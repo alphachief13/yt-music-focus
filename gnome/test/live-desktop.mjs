@@ -25,7 +25,7 @@ const work = mkdtempSync(join(tmpdir(), "fx-desk-"));
 const ext = join(work, "ext");
 cpSync(REPO, ext, { recursive: true, filter: (p) => !/\/(\.git|mockup\/shots|node_modules)(\/|$)/.test(p) });
 const mf = JSON.parse(readFileSync(join(ext, "manifest.json"), "utf8"));
-mf.permissions = [...mf.permissions, "nativeMessaging"];
+mf.permissions = [...new Set([...mf.permissions, "nativeMessaging"])];
 writeFileSync(join(ext, "manifest.json"), JSON.stringify(mf, null, 2));
 
 // --- native host, installed into the throwaway profile ---------------------
@@ -179,10 +179,18 @@ try {
   }
   check("Next follows the panel's queue", url.includes(ids[1]), url);
 
-  // Turning the setting off stops the host.
-  await swEval(`chrome.storage.local.get("settings").then(({settings = {}}) => chrome.storage.local.set({ settings: { ...settings, desktop: false } }))`);
+  // The in-page switch (☰ → Ajustes) reports the connection.
+  await page(`document.querySelector(".fx-menu-btn").click(); [...document.querySelectorAll(".fx-menu button")].find((b) => /Settings|Ajustes/.test(b.textContent)).click(); 1`);
+  await sleep(2500);
+  const desk = await page(`(() => { const r = [...document.querySelectorAll(".fx-switch-row")].find((b) => /GNOME/.test(b.textContent)); return r.getAttribute("aria-checked") + " | " + document.querySelector(".fx-desk-status").textContent; })()`);
+  check("Settings shows the panel switch on and connected", /^true \| (Connected|Conectado)/.test(desk), desk);
+
+  // Turning the setting off (from the same switch) stops the host.
+  await page(`[...document.querySelectorAll(".fx-switch-row")].find((b) => /GNOME/.test(b.textContent)).click(); 1`);
   await sleep(2000);
-  check("disabling the bridge stops the host", dbus("GetState").startsWith("ERROR"));
+  check("switching it off in Settings stops the host", dbus("GetState").startsWith("ERROR"));
+
+
 } catch (e) {
   failures++;
   console.error("test crashed:", e.message);

@@ -1,7 +1,6 @@
 /**
- * Focus — options page. Turning the desktop panel on requests the optional
- * "nativeMessaging" permission (needs this click = user gesture) and flips
- * settings.desktop; background.js / desktop.js then connect to the host.
+ * Focus — options page (same switch as Settings → Desktop panel, plus the
+ * install command). Flips settings.desktop; desktop.js connects to the host.
  */
 "use strict";
 (() => {
@@ -62,19 +61,7 @@
 
   toggle.addEventListener("click", async () => {
     const on = toggle.getAttribute("aria-checked") !== "true";
-    if (on) {
-      let granted = false;
-      try {
-        granted = await chrome.permissions.request({ permissions: ["nativeMessaging"] });
-      } catch (_) {
-        granted = false;
-      }
-      if (!granted) return show("no-permission");
-    }
     await FX.setSetting("desktop", on);
-    if (!on) {
-      try { await chrome.permissions.remove({ permissions: ["nativeMessaging"] }); } catch (_) { /* fine */ }
-    }
     setTimeout(() => refresh("desktopRetry"), 200);
   });
 

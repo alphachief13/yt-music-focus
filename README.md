@@ -68,9 +68,10 @@ O clique do meio no ícone toca/pausa e a roda do mouse muda o volume. Tocar alg
 
 É **escolhível**: vem desligado, e o Focus funciona igual sem ele, em qualquer sistema. Para ligar:
 
-1. `gnome/install.sh` instala o host de native messaging (Chrome, Chromium, Brave, Edge, Vivaldi) e a extensão do GNOME Shell (48–49). Ele não usa `sudo` e só mexe em `~/.local/share` e `~/.config/<navegador>/NativeMessagingHosts`. O ID da extensão é calculado pelo caminho desta pasta; se for outro, passe como argumento (`gnome/install.sh <id>`), que a página de ajustes mostra.
-2. No Wayland, saia e entre de novo na sessão (ou rode `gnome-extensions enable yt-focus@alphachief13`).
-3. No Focus: `☰` → Ajustes → **Painel do desktop** → ligar. O navegador pede a permissão opcional `nativeMessaging`.
+1. `gnome/install.sh` instala o host de native messaging (Chrome, Chromium, Brave, Edge, Vivaldi) e a extensão do GNOME Shell (48–49), e já a deixa marcada como ativa. Ele não usa `sudo` e só mexe em `~/.local/share`, `~/.config/<navegador>/NativeMessagingHosts` e na lista de extensões ativas do GNOME. O ID da extensão do Chrome é calculado pelo caminho desta pasta; se for outro, passe como argumento (`gnome/install.sh <id>`).
+2. No Wayland, saia e entre de novo na sessão **depois** de rodar o script: o GNOME só carrega extensões novas no login.
+3. Em `chrome://extensions`, recarregue o Focus (a versão com o painel pede a permissão `nativeMessaging`) e depois recarregue a aba do YouTube.
+4. No Focus: `☰` → Ajustes → **Painel do desktop (GNOME)** → ligar. Logo abaixo aparece "Conectado ao painel do GNOME", ou o que falta.
 
 ```
 aba do YouTube (focus.js) ⇄ service worker (desktop.js) ⇄ focus-host.js (GJS) ⇄ D-Bus ⇄ painel (extension.js)

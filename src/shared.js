@@ -83,6 +83,10 @@
       sVideo: "Video", vVideo: "Video", vCover: "Cover only", vDark: "Dark",
       vVideoShort: "Video", vCoverShort: "Cover", vDarkShort: "Dark", vNext: "click for",
       sDesktop: "Desktop panel (GNOME)", on: "on", off: "off",
+      reloadPage: "Focus was updated: reload this page (F5)",
+      deskOffHint: "Mirrors this player in the GNOME top bar. Optional.",
+      deskConnecting: "Connecting…", deskOk: "Connected to the GNOME panel.",
+      deskMissing: "Panel not installed. In a terminal: gnome/install.sh (in the Focus folder), then log out and back in.",
     },
     pt: {
       focus: "Focus", search: "Buscar", library: "Biblioteca", liked: "Curtidas",
@@ -104,6 +108,10 @@
       sVideo: "Vídeo", vVideo: "Vídeo ligado", vCover: "Só a capa", vDark: "Escuro",
       vVideoShort: "Vídeo", vCoverShort: "Capa", vDarkShort: "Escuro", vNext: "clique para",
       sDesktop: "Painel do desktop (GNOME)", on: "ligado", off: "desligado",
+      reloadPage: "O Focus foi atualizado: recarregue a página (F5)",
+      deskOffHint: "Espelha este player no painel superior do GNOME. Opcional.",
+      deskConnecting: "Conectando…", deskOk: "Conectado ao painel do GNOME.",
+      deskMissing: "Painel não instalado. No terminal: gnome/install.sh (na pasta do Focus), depois saia e entre na sessão.",
     },
   };
   const lang = (navigator.language || "en").toLowerCase().startsWith("pt") ? "pt" : "en";

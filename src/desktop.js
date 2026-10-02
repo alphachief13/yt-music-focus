@@ -1,9 +1,8 @@
 /**
  * Focus — optional desktop bridge (GNOME panel), loaded by background.js.
  *
- * Off by default. When the user enables it on the options page (which also
- * requests the optional "nativeMessaging" permission), the service worker
- * connects to the native host installed by gnome/install.sh:
+ * Off by default. When the user enables it (Settings → Desktop panel), the
+ * service worker connects to the native host installed by gnome/install.sh:
  *
  *   Focus tab (focus.js) ⇄ this worker ⇄ native host (GJS) ⇄ D-Bus ⇄ GNOME panel
  *
@@ -350,7 +349,11 @@ const Desktop = (() => {
       reply({ ctx });
       connect();
     } else if (msg.fx === "options") {
-      chrome.runtime.openOptionsPage();
+      const url = chrome.runtime.getURL("src/options.html");
+      chrome.runtime.openOptionsPage()
+        .catch(() => chrome.tabs.create({ url, index: sender.tab ? sender.tab.index + 1 : undefined }))
+        .then(() => reply({ ok: true }), () => reply({ ok: false }));
+      return true;
     } else if (msg.fx === "desktopStatus") {
       connect().then(() => setTimeout(() => reply({ status, error: lastError, id: chrome.runtime.id }), 400));
       return true;

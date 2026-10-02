@@ -100,8 +100,15 @@ if [[ -n "${YTFOCUS_NO_ENABLE:-}" ]]; then
 elif gnome-extensions enable "$UUID" 2>/dev/null; then
   echo "Panel enabled."
 else
-  echo "On Wayland GNOME only sees new extensions after logging out and back in."
-  echo "Then run: gnome-extensions enable $UUID"
+  # Wayland: the running shell can't see a new extension. Pre-enable it so it
+  # comes up on the next login without any extra command.
+  current="$(gsettings get org.gnome.shell enabled-extensions 2>/dev/null || echo "@as []")"
+  if [[ "$current" != *"'$UUID'"* ]]; then
+    if [[ "$current" == "@as []" || "$current" == "[]" ]]; then next="['$UUID']"; else next="${current%]}, '$UUID']"; fi
+    gsettings set org.gnome.shell enabled-extensions "$next" 2>/dev/null || true
+  fi
+  echo "On Wayland GNOME only loads new extensions at login: log out and back in once."
+  echo "(It is already marked as enabled; it will appear by itself.)"
 fi
 
 echo

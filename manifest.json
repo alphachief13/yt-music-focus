@@ -3,13 +3,17 @@
   "name": "Focus",
   "version": "1.0.0",
   "description": "Turns the YouTube watch page into an almost empty, distraction-free music player. Open YouTube. Start the music. Stop browsing.",
-  "permissions": ["storage"],
-  "optional_permissions": ["nativeMessaging"],
+  "permissions": [
+    "storage",
+    "nativeMessaging"
+  ],
   "options_ui": {
     "page": "src/options.html",
     "open_in_tab": true
   },
-  "host_permissions": ["https://www.youtube.com/*"],
+  "host_permissions": [
+    "https://www.youtube.com/*"
+  ],
   "background": {
     "service_worker": "src/background.js"
   },
@@ -22,21 +26,36 @@
   },
   "commands": {
     "toggle-focus": {
-      "suggested_key": { "default": "Alt+Shift+F" },
+      "suggested_key": {
+        "default": "Alt+Shift+F"
+      },
       "description": "Toggle Focus mode"
     }
   },
   "content_scripts": [
     {
-      "matches": ["https://www.youtube.com/*"],
-      "js": ["src/bridge.js"],
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "src/bridge.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": ["https://www.youtube.com/*"],
-      "js": ["src/shared.js", "src/ads.js", "src/focus.js"],
-      "css": ["src/ads.css", "src/focus.css"],
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "src/shared.js",
+        "src/ads.js",
+        "src/focus.js"
+      ],
+      "css": [
+        "src/ads.css",
+        "src/focus.css"
+      ],
       "run_at": "document_start"
     }
   ],
