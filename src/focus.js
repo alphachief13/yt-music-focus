@@ -1171,6 +1171,7 @@
       position: Math.round(video.currentTime || 0),
       playing: S.playing,
       ad: S.ad,
+      adSkippable: S.ad && !!FX.ads?.skippable(),
       volume: S.bridge ? Math.round(S.bridge.volume) : 100,
       muted: !!S.bridge?.muted,
       queue: getCtx()?.ids || [],
@@ -1197,6 +1198,7 @@
       case "next": next(); break;
       case "prev": prev(); break;
       case "seek": if (Number.isFinite(m.t) && !S.ad) send("seek", { t: m.t }); break;
+      case "skipAd": FX.ads?.skip(); break;
       case "volume":
         if (Number.isFinite(m.v)) {
           send("volume", { v: m.v });

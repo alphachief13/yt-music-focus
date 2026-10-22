@@ -69,6 +69,22 @@ export default class SnapExtension extends Extension {
             ind._doSearch();
             await wait(2500);
             await shot(dir, 'panel-search');
+
+            // Ad (fake-browser.py starts one): yellow bar, Skip locked, then unlocked.
+            for (let i = 0; i < 30 && ind._state?.status !== 'ad'; i++)
+                await wait(500);
+            await wait(600);
+            console.log(`ytf-snap: ad skippable=${!!ind._state?.adSkippable} skipVisible=${ind._skipBtn.visible} skipReactive=${ind._skipBtn.reactive}`);
+            await shot(dir, 'panel-ad-wait');
+            for (let i = 0; i < 20 && !ind._state?.adSkippable; i++)
+                await wait(500);
+            await wait(600);
+            console.log(`ytf-snap: ad skippable=${!!ind._state?.adSkippable} skipReactive=${ind._skipBtn.reactive}`);
+            await shot(dir, 'panel-ad');
+            ind._skipBtn.emit('clicked', 1);
+            for (let i = 0; i < 10 && ind._state?.status === 'ad'; i++)
+                await wait(300);
+            console.log(`ytf-snap: after skip status=${ind._state?.status} skipVisible=${ind._skipBtn.visible}`);
             console.log('ytf-snap: done');
         })().catch(e => console.log(`ytf-snap: ${e.message}\n${e.stack}`));
     }

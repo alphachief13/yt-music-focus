@@ -22,6 +22,7 @@ export const IFACE_XML = `
     <method name="Next"/>
     <method name="Previous"/>
     <method name="Seek"><arg type="d" direction="in" name="seconds"/></method>
+    <method name="SkipAd"/>
     <method name="SetVolume"><arg type="i" direction="in" name="volume"/></method>
     <method name="ToggleLikeCurrent"/>
     <method name="Like"><arg type="s" direction="in" name="trackJson"/></method>

@@ -4,7 +4,8 @@
  *
  * Exposes `window.__yf` for the daemon and reports state back through
  * `window.webkit.messageHandlers.ytfocus`. Ads are handled by Focus's own
- * src/ads.js (injected alongside); here we only report that one is showing.
+ * src/ads.js (injected alongside); here we only report that one is showing,
+ * its progress, and press "Skip" when the panel asks.
  */
 (() => {
     'use strict';
@@ -51,6 +52,9 @@
             playing: !!v && !v.paused && !v.ended,
             position: v && !ad ? v.currentTime : 0,
             length: v && !ad && Number.isFinite(v.duration) ? v.duration : 0,
+            adPosition: v && ad ? v.currentTime : 0,
+            adLength: v && ad && Number.isFinite(v.duration) ? v.duration : 0,
+            adSkippable: ad && !!window.FX?.ads?.skippable(),
         };
     }
 
@@ -170,16 +174,23 @@
             endedFor = null;
             player()?.nextVideo?.();
         },
+        skipAd() {
+            window.FX?.ads?.skip();
+            send(true);
+        },
         state,
     };
 
     let lastAd = false;
+    let lastSkippable = false;
     setInterval(() => {
         hookVideo();
         dismissYouThere();
         const ad = isAd();
-        if (ad !== lastAd) {
+        const skippable = ad && !!window.FX?.ads?.skippable();
+        if (ad !== lastAd || skippable !== lastSkippable) {
             lastAd = ad;
+            lastSkippable = skippable;
             if (!ad)
                 applyVolume();
             send(true);

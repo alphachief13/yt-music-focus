@@ -48,7 +48,7 @@
 }
 
 .ytf-artist.ytf-ad {
-  color: -st-accent-color;
+  color: #f6d32d;
 }
 
 /* --- Progresso / tempos ---------------------------------------------- */
@@ -62,6 +62,48 @@
   font-feature-settings: "tnum";
   color: rgba(255, 255, 255, 0.55);
   padding: 0 4px;
+  spacing: 8px;
+}
+
+/* --- Anúncio: barra amarela (só leitura) + botão Pular ---------------- */
+
+.ytf-progress.ytf-ad {
+  -barlevel-active-background-color: #f6d32d;
+  -barlevel-overdrive-color: #f6d32d;
+  -slider-handle-radius: 0px;
+  -slider-handle-border-width: 0px;
+}
+
+.ytf-skip {
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 8.5pt;
+  font-weight: bold;
+  background-color: #f6d32d;
+  color: #241f31;
+  transition-duration: 100ms;
+}
+
+.ytf-skip:hover,
+.ytf-skip:focus {
+  box-shadow: inset 0 0 0 100px rgba(255, 255, 255, 0.2);
+}
+
+.ytf-skip:active {
+  box-shadow: inset 0 0 0 100px rgba(0, 0, 0, 0.12);
+}
+
+.ytf-skip:insensitive {
+  background-color: rgba(246, 211, 45, 0.25);
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.ytf-skip-content {
+  spacing: 6px;
+}
+
+.ytf-skip-icon {
+  icon-size: 12px;
 }
 
 /* --- Botões ---------------------------------------------------------- */

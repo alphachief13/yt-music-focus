@@ -329,7 +329,7 @@ const Desktop = (() => {
     switch (m.type) {
       case "cmd": {
         const c = m.cmd;
-        if (["toggle", "next", "prev", "likeCurrent"].includes(c)) toTab({ cmd: c });
+        if (["toggle", "next", "prev", "likeCurrent", "skipAd"].includes(c)) toTab({ cmd: c });
         else if (c === "seek" && Number.isFinite(m.t)) toTab({ cmd: c, t: m.t });
         else if (c === "volume" && Number.isFinite(m.v)) toTab({ cmd: c, v: Math.max(0, Math.min(100, Math.round(m.v))) });
         else if (c === "play") play(m.ids, Number(m.index) || 0);

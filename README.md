@@ -63,6 +63,7 @@ Uma versão do yt-pod que espelha o Focus em vez de tocar o YouTube Music por co
 - ♡, curtidas, playlists e recentes (a mesma biblioteca do navegador);
 - busca no YouTube, sem mexer na aba;
 - modo de vídeo (vídeo/capa/escuro) e Focus liga/desliga.
+- durante um anúncio, uma barra amarela com o progresso dele e o botão **Pular anúncio**, que libera quando o "Pular" do YouTube libera (é o mesmo botão, só apertado pelo painel).
 
 **Sem o navegador:** com o painel ativo, fechar o navegador no meio de uma música não para o som. Um player escondido (o motor do yt-pod: WebKitGTK no youtube.com, com o mesmo `src/ads.js` para os anúncios) continua a mesma música, do mesmo ponto, com a mesma fila. Pelo painel dá para tocar, buscar, curtir e mexer em playlists sem abrir o navegador. Abrir o painel sem navegador também inicia esse player, parado na última música.
 

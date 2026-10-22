@@ -43,7 +43,7 @@ fi
 
 dbus-run-session -- bash -c '
   python3 "$1/test/fake-browser.py" "$XDG_DATA_HOME/yt-focus/host/focus-host.js" > "$2/fake.log" 2>&1 &
-  timeout 40 gnome-shell --headless --wayland --no-x11 --wayland-display=wayland-ytf-test \
+  timeout 50 gnome-shell --headless --wayland --no-x11 --wayland-display=wayland-ytf-test \
     --virtual-monitor 1440x900 > "$2/shell.log" 2>&1 || true
   kill %1 2>/dev/null || true
 ' _ "$ROOT" "$TMP"

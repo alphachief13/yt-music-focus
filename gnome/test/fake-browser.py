@@ -41,12 +41,33 @@ def reader():
         elif m.get("cmd") == "toggle":
             state["playing"] = not state["playing"]
             send({"type": "state", "state": state})
+        elif m.get("cmd") == "skipAd" and ad.get("skippable"):
+            ad.clear()
+            send({"type": "state", "state": shown()})
+
+# An ad from AD_AT seconds on: the tab then reports the ad's own <video>
+# (position/duration), and "Skip" unlocks after AD_SKIP_AFTER seconds.
+AD_AT, AD_LEN, AD_SKIP_AFTER = 16, 30, 3
+ad = {}
+
+def shown():
+    if not ad:
+        return state
+    return {**state, "ad": True, "position": ad["pos"], "duration": AD_LEN, "adSkippable": ad["skippable"]}
 
 threading.Thread(target=reader, daemon=True).start()
 send({"type": "hello", "version": "test"})
 send({"type": "library", "library": library})
+start = time.time()
+ad_done = False
 while True:
-    send({"type": "state", "state": state})
+    if not ad and not ad_done and time.time() - start >= AD_AT:
+        ad.update(pos=0, skippable=False)
+    send({"type": "state", "state": shown()})
     time.sleep(1)
-    if state["playing"]:
+    if ad:
+        ad_done = True
+        ad["pos"] = min(AD_LEN, ad["pos"] + 1)
+        ad["skippable"] = ad["pos"] >= AD_SKIP_AFTER
+    elif state["playing"]:
         state["position"] = min(state["duration"], state["position"] + 1)

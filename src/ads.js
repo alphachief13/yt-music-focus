@@ -41,16 +41,19 @@
   const isAdShowing = (player) => AD_CLASSES.some((c) => player.classList.contains(c));
 
   // ----------------------------------------------------------- auto-skip
-  function trySkipAd(player) {
+  function skipButton(player) {
     const scope = player || document;
     for (const sel of SKIP_BUTTON_SELECTORS) {
       const btn = scope.querySelector(sel);
-      if (btn && btn.offsetParent !== null && !btn.disabled) {
-        btn.click();
-        return true;
-      }
+      if (btn && btn.offsetParent !== null && !btn.disabled) return btn;
     }
-    return false;
+    return null;
+  }
+
+  function trySkipAd(player) {
+    const btn = skipButton(player);
+    if (btn) btn.click();
+    return !!btn;
   }
 
   // YouTube sometimes resets the rate, so it is re-applied on every check.
@@ -176,6 +179,13 @@
     check();
   });
   globalThis.FX.onChange(check);
+
+  // For the GNOME panel (src/focus.js, gnome/daemon/page/bridge.js): show the
+  // ad's progress there and let the user press "Skip" without the tab.
+  globalThis.FX.ads = {
+    skippable: () => { const p = getPlayer(); return !!p && isAdShowing(p) && !!skipButton(p); },
+    skip: () => { const p = getPlayer(); return !!p && isAdShowing(p) && trySkipAd(p); },
+  };
 
   // Fallback polling, frequent enough to click "Skip" as soon as it unlocks.
   setInterval(check, 250);

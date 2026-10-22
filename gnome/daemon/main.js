@@ -303,6 +303,7 @@ class Player {
             const {title, artist} = parseTitle(s.title, s.author);
             this.track = {...this.track, title, artist: this.track.artist || artist};
         }
+        this.ad = s.ad ? {position: s.adPosition || 0, length: s.adLength || 0, skippable: !!s.adSkippable} : null;
         if (s.ad)
             this.status = 'ad';
         else if (!this.loadingId)
@@ -514,8 +515,10 @@ class Player {
             backend: 'local',
             track: t ? {videoId: t.videoId, title: t.title || '', artist: t.artist || '', thumbFile: thumbNow(t.videoId, () => this._emitState())} : null,
             status: t ? this.status : 'idle',
-            position: this.position,
-            length: this.length,
+            // Same shape as the browser: during an ad, position/length are the ad's.
+            adSkippable: !!(this.status === 'ad' && this.ad?.skippable),
+            position: this.status === 'ad' && this.ad ? this.ad.position : this.position,
+            length: this.status === 'ad' && this.ad ? this.ad.length : this.length,
             volume: this.volume,
             muted: false,
             liked: !!t && this._liked(t.videoId),
@@ -612,6 +615,7 @@ class Player {
             Next: () => self.next(),
             Previous: () => self.previous(),
             Seek: t => self.seek(t),
+            SkipAd: () => self._page('skipAd'),
             SetVolume: v => self.setVolume(v),
             ToggleLikeCurrent: () => {
                 const t = self.track;

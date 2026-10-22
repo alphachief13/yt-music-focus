@@ -36,6 +36,7 @@ const T = PT ? {
     useAdd: 'Use o + nas músicas para adicionar', add: t => `Adicionar “${t}”`, added: t => `Adicionada: ${t}`,
     songs: n => `${n} música${n === 1 ? '' : 's'}`, likedN: n => `${n} curtida${n === 1 ? '' : 's'}`,
     ad: 'Anúncio silenciado e pulando…', adStatus: 'Pulando anúncio…',
+    adLabel: 'Anúncio', skipAd: 'Pular anúncio', skipAdWait: 'Ainda não dá para pular',
     connected: 'Focus · navegador conectado', offlineStatus: 'Ative o painel nos ajustes do Focus',
     local: 'Tocando sem o navegador', starting: 'Iniciando o player…', login: 'Entrar no YouTube (opcional)',
     toBrowser: 'Continuar no navegador',
@@ -55,6 +56,7 @@ const T = PT ? {
     useAdd: 'Use + on songs to add them', add: t => `Add “${t}”`, added: t => `Added: ${t}`,
     songs: n => `${n} song${n === 1 ? '' : 's'}`, likedN: n => `${n} liked`,
     ad: 'Ad muted and skipping…', adStatus: 'Skipping ad…',
+    adLabel: 'Ad', skipAd: 'Skip ad', skipAdWait: "Can't skip yet",
     connected: 'Focus · browser connected', offlineStatus: 'Enable the panel in Focus settings',
     local: 'Playing without the browser', starting: 'Starting the player…', login: 'Sign in to YouTube (optional)',
     toBrowser: 'Continue in the browser',
@@ -354,9 +356,18 @@ class FocusIndicator extends PanelMenu.Button {
         root.add_child(this._progress);
 
         const times = new St.BoxLayout({style_class: 'ytf-times'});
-        this._posLabel = new St.Label({text: '0:00', x_expand: true});
-        this._lenLabel = new St.Label({text: '0:00'});
+        this._posLabel = new St.Label({text: '0:00', x_expand: true, y_align: Clutter.ActorAlign.CENTER});
+        this._lenLabel = new St.Label({text: '0:00', y_align: Clutter.ActorAlign.CENTER});
+        // Only during an ad: YouTube's own "Skip" button, pressed from here.
+        const skipContent = new St.BoxLayout({style_class: 'ytf-skip-content'});
+        skipContent.add_child(new St.Label({text: T.skipAd, y_align: Clutter.ActorAlign.CENTER}));
+        skipContent.add_child(new St.Icon({icon_name: 'media-skip-forward-symbolic', style_class: 'ytf-skip-icon'}));
+        this._skipBtn = new St.Button({
+            style_class: 'ytf-skip', child: skipContent, can_focus: true, visible: false, accessible_name: T.skipAd,
+        });
+        this._skipBtn.connect('clicked', () => this._call('SkipAd'));
         times.add_child(this._posLabel);
+        times.add_child(this._skipBtn);
         times.add_child(this._lenLabel);
         root.add_child(times);
 
@@ -501,7 +512,7 @@ class FocusIndicator extends PanelMenu.Button {
         const pos = this._position();
         if (!this._seeking)
             this._progress.value = len > 0 ? Math.min(1, pos / len) : 0;
-        this._posLabel.text = s?.status === 'ad' ? T.adStatus : fmtTime(pos);
+        this._posLabel.text = s?.status === 'ad' ? T.adLabel : fmtTime(pos);
         this._lenLabel.text = len > 0 ? (s?.status === 'ad' ? `−${fmtTime(len - pos)}` : fmtTime(len)) : '0:00';
     }
 
@@ -536,6 +547,15 @@ class FocusIndicator extends PanelMenu.Button {
         for (const b of [this._playBtn, this._prevBtn, this._nextBtn, this._likeBtn, this._progress, this._volume])
             b.reactive = !!t;
         this._progress.reactive = !!t && !ad;
+        // The ad gets its own (yellow, read-only) bar and a Skip button that
+        // unlocks when YouTube's does.
+        if (ad)
+            this._progress.add_style_class_name('ytf-ad');
+        else
+            this._progress.remove_style_class_name('ytf-ad');
+        this._skipBtn.visible = ad;
+        this._skipBtn.reactive = ad && !!s.adSkippable;
+        this._skipBtn.accessible_name = s?.adSkippable ? T.skipAd : T.skipAdWait;
         this._modeBtn.reactive = online;
         this._focusBtn.reactive = online;
 

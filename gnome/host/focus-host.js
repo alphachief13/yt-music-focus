@@ -138,6 +138,8 @@ function stateJson() {
             thumbFile: thumbNow(s.id, emitStateSoon),
         },
         status: s.ad ? 'ad' : s.playing ? 'playing' : 'paused',
+        // During an ad, position/length are the ad's (the tab reports its <video>).
+        adSkippable: !!(s.ad && s.adSkippable),
         position: Number(s.position) || 0,
         length: Number(s.duration) || 0,
         volume: s.muted ? 0 : Number(s.volume) || 0,
@@ -320,6 +322,7 @@ const impl = {
     Next: () => cmd('next'),
     Previous: () => cmd('prev'),
     Seek: t => cmd('seek', {t: Math.max(0, t)}),
+    SkipAd: () => cmd('skipAd'),
     SetVolume: v => cmd('volume', {v: Math.max(0, Math.min(100, v))}),
     ToggleLikeCurrent: () => cmd('likeCurrent'),
     Like: json => libOp('like', {track: parseTrack(json)}),
