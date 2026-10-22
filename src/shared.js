@@ -31,7 +31,12 @@
   }
 
   const ready = (async () => {
-    if (!alive()) return cache;
+    if (!alive()) {
+      // Outside the extension (the GNOME local player, gnome/daemon) there is
+      // no chrome.storage: the player injects the user's settings here first.
+      if (globalThis.__fxSettings) cache.settings = normSettings(globalThis.__fxSettings);
+      return cache;
+    }
     const got = await chrome.storage.local.get(["settings", "songs", "playlists", "recent"]);
     cache.settings = normSettings(got.settings);
     cache.songs = got.songs && typeof got.songs === "object" ? got.songs : {};

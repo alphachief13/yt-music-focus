@@ -5,7 +5,8 @@
 //   ~/.local/share/yt-focus/session.json  last song / position / queue, for the hand-off
 //
 // The library shape is the one the panel uses:
-//   {liked: [track], playlists: [{id, name, tracks: [track]}], recent: [track], settings: {videoMode, focus}}
+//   {liked: [track], playlists: [{id, name, tracks: [track]}], recent: [track],
+//    settings: {videoMode, focus, adMute, adBlackout, adSkip}}
 //   track = {videoId, title, artist, duration}
 import GLib from 'gi://GLib';
 
@@ -57,8 +58,20 @@ export function cleanTrack(t) {
     };
 }
 
+// Ad handling flags (src/ads.js), mirrored from the browser settings.
+export const AD_KEYS = ['adMute', 'adBlackout', 'adSkip'];
+
 export function emptyLibrary() {
-    return {liked: [], playlists: [], recent: [], settings: {videoMode: 'video', focus: true}};
+    return {
+        liked: [], playlists: [], recent: [],
+        settings: {videoMode: 'video', focus: true, adMute: true, adBlackout: true, adSkip: true},
+    };
+}
+
+/** Just the ad flags from library.json (defaults: all on). */
+export function adSettings() {
+    const s = normalizeLibrary(readJson('library.json', null)).settings;
+    return Object.fromEntries(AD_KEYS.map(k => [k, s[k]]));
 }
 
 export function normalizeLibrary(lib) {
@@ -76,6 +89,10 @@ export function normalizeLibrary(lib) {
             out.settings.videoMode = lib.settings.videoMode;
         if (typeof lib.settings.focus === 'boolean')
             out.settings.focus = lib.settings.focus;
+        for (const k of AD_KEYS) {
+            if (typeof lib.settings[k] === 'boolean')
+                out.settings[k] = lib.settings[k];
+        }
     }
     return out;
 }

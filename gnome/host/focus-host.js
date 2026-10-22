@@ -228,17 +228,14 @@ function saveSession() {
 const saveSessionSoon = debounce(saveSession, 2000);
 
 function saveMirror() {
-    const lib = normalizeLibrary({
-        ...library,
-        settings: {videoMode: state?.videoMode, focus: state?.focus},
-    });
-    if (!state) {
-        // keep the last known settings
-        const old = readJson('library.json', null);
-        if (old?.settings)
-            lib.settings = normalizeLibrary(old).settings;
+    // Start from what is on disk so nothing known is lost when Chrome hasn't
+    // sent a tab state (videoMode/focus) or the ad flags yet.
+    const settings = {...normalizeLibrary(readJson('library.json', null)).settings, ...library.settings};
+    if (state) {
+        settings.videoMode = state.videoMode;
+        settings.focus = state.focus;
     }
-    writeJson('library.json', lib);
+    writeJson('library.json', normalizeLibrary({...library, settings}));
 }
 
 /** Edits made in the panel without the browser: replay them in the browser. */

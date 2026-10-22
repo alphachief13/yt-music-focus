@@ -118,6 +118,8 @@ try {
     if (st?.track?.videoId === VID && st.status === "playing") break;
   }
   check("panel state mirrors the tab", st?.track?.videoId === VID && st.track.title === "505" && st.track.artist === "Arctic Monkeys", JSON.stringify(st));
+  // The cover is downloaded on the first GetState: give it a moment.
+  for (let i = 0; i < 10 && !st?.track?.thumbFile; i++) { await sleep(500); st = json(dbus("GetState")); }
   check("cover cached for the panel", !!st?.track?.thumbFile, st?.track?.thumbFile);
 
   // Commands from the panel reach the YouTube player.
@@ -142,6 +144,15 @@ try {
   await sleep(1200);
   check("SetVideoMode switches the tab to cover", await page(`document.documentElement.classList.contains("fx-vcover")`) === true);
   dbus("SetVideoMode", "video");
+
+  // Ad toggles in Settings reach library.json, read by the local player (same ads.js).
+  const libFile = join(work, "data", "yt-focus", "library.json");
+  const adFlags = () => { try { const s = JSON.parse(readFileSync(libFile, "utf8")).settings; return [s.adMute, s.adBlackout, s.adSkip]; } catch { return null; } };
+  check("ad settings mirrored (defaults on)", JSON.stringify(adFlags()) === "[true,true,true]", JSON.stringify(adFlags()));
+  await swEval(`chrome.storage.local.get("settings").then(({settings = {}}) => chrome.storage.local.set({ settings: { ...settings, adSkip: false, adMute: false } }))`);
+  await sleep(1500);
+  check("turning ad skip/mute off reaches the local player's settings", JSON.stringify(adFlags()) === "[false,true,false]", JSON.stringify(adFlags()));
+  await swEval(`chrome.storage.local.get("settings").then(({settings = {}}) => chrome.storage.local.set({ settings: { ...settings, adSkip: true, adMute: true } }))`);
 
   dbus("ToggleLikeCurrent");
   await sleep(1200);

@@ -15,6 +15,7 @@
 const Desktop = (() => {
   const HOST = "io.github.alphachief13.focus";
   const ID_RE = /^[\w-]{11}$/;
+  const AD_KEYS = ["adMute", "adBlackout", "adSkip"];
   const RETRY_MS = 30_000;
   const { cache, save, ready, parseTitle } = globalThis.FX;
 
@@ -132,6 +133,8 @@ const Desktop = (() => {
       liked: Object.values(songs).filter((s) => s.liked).sort((a, b) => (b.likedAt || 0) - (a.likedAt || 0)).map(track),
       playlists: cache.playlists.map((p) => ({ id: p.id, name: p.name, tracks: p.ids.map((id) => songs[id]).filter(Boolean).map(track) })),
       recent: cache.recent.map((id) => songs[id]).filter(Boolean).map(track),
+      // The local player (no browser) runs the same src/ads.js: give it the flags.
+      settings: Object.fromEntries(AD_KEYS.map((k) => [k, !!cache.settings[k]])),
     };
   }
 
@@ -394,6 +397,7 @@ const Desktop = (() => {
       if (!now && was) disconnect("off");
     }
     if (changes.songs || changes.playlists || changes.recent) pushLibrary();
+    else if (changes.settings && AD_KEYS.some((k) => changes.settings.oldValue?.[k] !== changes.settings.newValue?.[k])) pushLibrary();
     if (changes.songs || changes.settings) pushState();
   });
 

@@ -24,7 +24,7 @@ import Adw from 'gi://Adw?version=1';
 import WebKit from 'gi://WebKit?version=6.0';
 
 import {IFACE_XML, BUS_NAME, OBJECT_PATH} from '../common/iface.js';
-import {BASE, ID_RE, readJson, writeJson, libraryView, applyOp, addPending, cleanTrack} from '../common/store.js';
+import {BASE, ID_RE, readJson, writeJson, libraryView, applyOp, addPending, cleanTrack, adSettings} from '../common/store.js';
 import {ensureThumb, thumbNow} from '../common/thumbs.js';
 import {search, parseTitle} from '../common/search.js';
 
@@ -108,6 +108,12 @@ class Player {
         const style = code => code && ucm.add_style_sheet(new WebKit.UserStyleSheet(code, top, WebKit.UserStyleLevel.USER, null, null));
 
         script(pageAsset('visibility.js'), start);
+        this.ucm = ucm;
+        this._applyAdSettings();
+        // The host rewrites library.json when the user changes them in the browser.
+        this.libMonitor = Gio.File.new_for_path(GLib.build_filenamev([BASE, 'library.json']))
+            .monitor_file(Gio.FileMonitorFlags.WATCH_MOVES, null);
+        this.libMonitor.connect('changed', () => this._applyAdSettings());
         style(pageAsset('ads.css'));
         style(QUIET_CSS);
         // Focus's ad handling (yt-ads-sucks port) — same code as in the browser.
@@ -213,8 +219,40 @@ class Player {
         this._js(`window.__yf && window.__yf.${method}(${a}); true`);
     }
 
+    /**
+     * The browser's ad settings (mute / blackout / skip), mirrored in
+     * library.json by the host. src/shared.js picks up `__fxSettings` at page
+     * start; a page already open is updated in place.
+     */
+    _applyAdSettings() {
+        const flags = adSettings();
+        const json = JSON.stringify(flags);
+        if (json === this.adJson)
+            return;
+        this.adJson = json;
+        if (this.adScript)
+            this.ucm.remove_script(this.adScript);
+        this.adScript = new WebKit.UserScript(`globalThis.__fxSettings = ${json};`,
+            WebKit.UserContentInjectedFrames.TOP_FRAME, WebKit.UserScriptInjectionTime.START, null, null);
+        this.ucm.add_script(this.adScript);
+        if (this.view)
+            this._js(`globalThis.FX && Object.assign(globalThis.FX.cache.settings, ${json}); true`);
+        if (DEBUG)
+            log(`ad settings: ${json}`);
+        if (DEBUG && this.view)
+            this._logPageAdSettings();
+    }
+
+    // Debug: what ads.js on the page is actually using.
+    _logPageAdSettings() {
+        this._js('JSON.stringify(globalThis.FX ? globalThis.FX.cache.settings : null)', v => {
+            log(`page ad settings: ${v?.to_string?.() ?? '?'}`);
+        });
+    }
+
     _loadUrl(id, start = 0) {
         this._ensureView();
+        this._applyAdSettings();
         this.pageReady = false;
         const t = Math.floor(start) > 0 ? `&t=${Math.floor(start)}s` : '';
         this.view.load_uri(`https://www.youtube.com/watch?v=${encodeURIComponent(id)}${t}`);
@@ -229,6 +267,8 @@ class Player {
         case 'ready':
             this.pageReady = true;
             this._page('config', {volume: this.volume, play: this.status !== 'paused'});
+            if (DEBUG)
+                this._logPageAdSettings();
             break;
         case 'ended':
             if (this.track && m.videoId === this.track.videoId)
